@@ -2,6 +2,7 @@ from flask import Flask, request, abort
 from linebot.v3.messaging import MessagingApi, Configuration, ApiClient, ReplyMessageRequest, TextMessage
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from places import places
 
 app = Flask(__name__)
 
@@ -14,21 +15,20 @@ handler = WebhookHandler(CHANNEL_SECRET)
 
 @app.route("/")
 def home():
-    return "LINE Bot is running"
+    return "LINE BOT RUNNING"
 
 
 @app.route("/webhook", methods=['POST'])
 def webhook():
-    signature = request.headers.get('X-Line-Signature')
+    signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
 
     try:
         handler.handle(body, signature)
-    except Exception as e:
-        print(e)
+    except Exception:
         abort(400)
 
-    return 'OK'
+    return "OK"
 
 
 @handler.add(MessageEvent, message=TextMessageContent)
@@ -36,26 +36,51 @@ def handle_message(event):
 
     text = event.message.text
 
+    # แสดงรายการสถานที่
     if text == "สถานที่ท่องเที่ยว":
-        reply = """
-สถานที่ท่องเที่ยวท่ายาง
 
-1. วัดท่าคอย
-2. อุโบสถ 100 ปี
-3. อุทยานปลาวัดท่าคอย
-4. ตลาดสดท่ายาง
-5. ร้านทองม้วนแม่เล็ก
-6. ร้านผัดไทย 100 ปี
-7. ศาลเจ้าพ่อกวนอู
-8. ข้าวแช่แม่เล็ก สกิดใจ
-9. ศาลเจ้าแม่ทับทิม
+        reply = "📍 สถานที่ท่องเที่ยวในท่ายาง\n\n"
+
+        for name in places:
+            reply += f"• {name}\n"
+
+        reply += "\nพิมพ์ชื่อสถานที่เพื่อดูรายละเอียด"
+
+    # แสดงรายละเอียดสถานที่
+    elif text in places:
+
+        place = places[text]
+
+        reply = f"""
+📍 {text}
+
+📖 ประวัติ
+{place['history']}
+
+⭐ จุดเด่น
+{place['highlight']}
+
+⏰ เวลาเปิด
+{place['time']}
+
+📍 ที่อยู่
+{place['address']}
+
+🗺 แผนที่
+{place['map']}
 """
 
-    elif text == "วัดท่าคอย":
-        reply = "วัดท่าคอย เป็นวัดเก่าแก่ในอำเภอท่ายาง จังหวัดเพชรบุรี"
-
     else:
-        reply = "พิมพ์คำว่า สถานที่ท่องเที่ยว เพื่อดูรายการ"
+
+        reply = """
+สวัสดี 👋
+
+พิมพ์คำว่า
+
+สถานที่ท่องเที่ยว
+
+เพื่อดูสถานที่ในท่ายาง
+"""
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
