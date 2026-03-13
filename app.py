@@ -1,13 +1,24 @@
 from flask import Flask, request, abort
-from linebot.v3.messaging import MessagingApi, Configuration, ApiClient, ReplyMessageRequest, TextMessage
+from linebot.v3.messaging import (
+    MessagingApi,
+    Configuration,
+    ApiClient,
+    ReplyMessageRequest,
+    TextMessage,
+    ImageMessage,
+    QuickReply,
+    QuickReplyItem,
+    MessageAction
+)
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from places import places
+import difflib
 
 app = Flask(__name__)
 
-CHANNEL_ACCESS_TOKEN = "4daQ2JUnEe+vEmbDJhOmn48fWc7d/Kb6+iWXIm05H8ngOFqDPLyNpgdTO58cKvHyfcL/q/gytkIljJiMSjAQCvN5wmahGaLKoVocuepLo5tyQq7q33YfsPZPhxpO8kPOrpnECFRdZPB0JjHKaKaPOQdB04t89/1O/w1cDnyilFU="
-CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
+CHANNEL_ACCESS_TOKEN = "YOUR_CHANNEL_ACCESS_TOKEN"
+CHANNEL_SECRET = "YOUR_CHANNEL_SECRET"
 
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
@@ -18,9 +29,9 @@ def home():
     return "LINE BOT RUNNING"
 
 
-@app.route("/webhook", methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    signature = request.headers['X-Line-Signature']
+    signature = request.headers["X-Line-Signature"]
     body = request.get_data(as_text=True)
 
     try:
@@ -34,24 +45,48 @@ def webhook():
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
 
-    text = event.message.text
+    text = event.message.text.strip()
 
-    # แสดงรายการสถานที่
-    if text == "สถานที่ท่องเที่ยว":
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
 
-        reply = "📍 สถานที่ท่องเที่ยวในท่ายาง\n\n"
+        # --------------------------------
+        # แสดงรายการสถานที่ (มีปุ่ม)
+        # --------------------------------
+        if text == "สถานที่ท่องเที่ยว":
 
-        for name in places:
-            reply += f"• {name}\n"
+            items = []
 
-        reply += "\nพิมพ์ชื่อสถานที่เพื่อดูรายละเอียด"
+            for name in places:
+                items.append(
+                    QuickReplyItem(
+                        action=MessageAction(
+                            label=name,
+                            text=name
+                        )
+                    )
+                )
 
-    # แสดงรายละเอียดสถานที่
-    elif text in places:
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text="📍 เลือกสถานที่ท่องเที่ยวในท่ายาง",
+                            quick_reply=QuickReply(items=items)
+                        )
+                    ]
+                )
+            )
 
-        place = places[text]
+        # --------------------------------
+        # ถ้าพิมพ์ชื่อสถานที่ถูกต้อง
+        # --------------------------------
+        elif text in places:
 
-        reply = f"""
+            place = places[text]
+
+            reply_text = f"""
 📍 {text}
 
 📖 ประวัติ
@@ -70,26 +105,43 @@ def handle_message(event):
 {place['map']}
 """
 
-    else:
-
-        reply = """
-สวัสดี 👋
-
-พิมพ์คำว่า
-
-สถานที่ท่องเที่ยว
-
-เพื่อดูสถานที่ในท่ายาง
-"""
-
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=reply)]
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        ImageMessage(
+                            original_content_url=place["image"],
+                            preview_image_url=place["image"]
+                        ),
+                        TextMessage(text=reply_text)
+                    ]
+                )
             )
-        )
+
+        # --------------------------------
+        # fuzzy search (พิมพ์ผิด)
+        # --------------------------------
+        else:
+
+            match = difflib.get_close_matches(text, places.keys(), n=1, cutoff=0.5)
+
+            if match:
+
+                name = match[0]
+                place = places[name]
+
+                reply = f"คุณหมายถึง '{name}' ใช่ไหม\n\n{place['history']}"
+
+            else:
+
+                reply = "พิมพ์ 'สถานที่ท่องเที่ยว' เพื่อดูรายการสถานที่"
+
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply)]
+                )
+            )
 
 
 if __name__ == "__main__":
