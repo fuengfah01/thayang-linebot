@@ -94,20 +94,29 @@ def handle_message(event):
             reply_text = f"""
 📍 {text}
 
-📖 ประวัติ
-{place['history']}
+📖 ประวัติความเป็นมา
+{place.get('history','-')}
 
-⭐ จุดเด่น
-{place['highlight']}
+⭐ จุดเด่นของสถานที่
+{place.get('highlight','-')}
 
-⏰ เวลาเปิด
-{place['time']}
+🎯 กิจกรรมที่สามารถทำได้
+{place.get('activities','-')}
+
+🏛 ความสำคัญทางวัฒนธรรม
+{place.get('culture','-')}
+
+💡 คำแนะนำสำหรับผู้มาเยือน
+{place.get('tips','-')}
+
+⏰ เวลาเปิดให้เข้าชม
+{place.get('time','-')}
 
 📍 ที่อยู่
-{place['address']}
+{place.get('address','-')}
 
 🗺 แผนที่
-{place['map']}
+{place.get('map','-')}
 """
 
             line_bot_api.reply_message(
@@ -143,13 +152,7 @@ def handle_message(event):
 
             else:
 
-                reply = """
-พิมพ์คำว่า
-
-สถานที่ท่องเที่ยว
-
-เพื่อดูสถานที่ในท่ายาง
-"""
+                reply = """พิมพ์คำว่า สถานที่ท่องเที่ยว เพื่อดูสถานที่ในท่ายาง"""
 
             line_bot_api.reply_message(
                 ReplyMessageRequest(
