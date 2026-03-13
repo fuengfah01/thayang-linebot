@@ -94,30 +94,46 @@ def handle_message(event):
             reply_text = f"""
 📍 {text}
 
-📖 ประวัติความเป็นมา
-{place.get('history','-')}
+⭐ จุดเด่น
+{place['highlight']}
 
-⭐ จุดเด่นของสถานที่
-{place.get('highlight','-')}
+⏰ เวลาเปิด
+{place['time']}
 
-🎯 กิจกรรมที่สามารถทำได้
-{place.get('activities','-')}
+📍 แผนที่
+{place['map']}
 
-🏛 ความสำคัญทางวัฒนธรรม
-{place.get('culture','-')}
-
-💡 คำแนะนำสำหรับผู้มาเยือน
-{place.get('tips','-')}
-
-⏰ เวลาเปิดให้เข้าชม
-{place.get('time','-')}
-
-📍 ที่อยู่
-{place.get('address','-')}
-
-🗺 แผนที่
-{place.get('map','-')}
+🧭 นำทาง
+กดลิงก์เพื่อเปิด Google Maps
 """
+
+#             reply_text = f"""
+# 📍 {text}
+
+# 📖 ประวัติความเป็นมา
+# {place.get('history','-')}
+
+# ⭐ จุดเด่นของสถานที่
+# {place.get('highlight','-')}
+
+# 🎯 กิจกรรมที่สามารถทำได้
+# {place.get('activities','-')}
+
+# 🏛 ความสำคัญทางวัฒนธรรม
+# {place.get('culture','-')}
+
+# 💡 คำแนะนำสำหรับผู้มาเยือน
+# {place.get('tips','-')}
+
+# ⏰ เวลาเปิดให้เข้าชม
+# {place.get('time','-')}
+
+# 📍 ที่อยู่
+# {place.get('address','-')}
+
+# 🗺 แผนที่
+# {place.get('map','-')}
+# """
 
             line_bot_api.reply_message(
                 ReplyMessageRequest(
