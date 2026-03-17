@@ -13,8 +13,10 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+
 from places import places
-import difflib
+from activities import activities
+
 import os
 
 app = Flask(__name__)
@@ -24,6 +26,9 @@ CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
 
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
+
+# จำสถานะ user
+user_state = {}
 
 
 @app.route("/")
@@ -45,15 +50,15 @@ def webhook():
 
 
 # =========================
-# 🧠 SMART SEARCH (ไม่ใช้ AI)
+# 🧠 Smart Search
 # =========================
 def smart_search(user_text):
 
     keywords_map = {
-        "วัด": ["วัด", "ไหว้พระ", "ทำบุญ"],
-        "อาหาร": ["กิน", "หิว", "ร้าน", "อาหาร"],
-        "เที่ยว": ["เที่ยว", "ที่เที่ยว", "พักผ่อน"],
-        "ถ่ายรูป": ["ถ่ายรูป", "วิว", "สวย", "เช็คอิน"]
+        "วัด": ["วัด", "ไหว้พระ"],
+        "อาหาร": ["กิน", "หิว", "ร้าน"],
+        "เที่ยว": ["เที่ยว"],
+        "ถ่ายรูป": ["ถ่ายรูป", "วิว"]
     }
 
     scores = {}
@@ -61,20 +66,13 @@ def smart_search(user_text):
     for name, p in places.items():
         score = 0
 
-        # ชื่อตรง
         if name in user_text:
             score += 5
 
-        # keyword
         for words in keywords_map.values():
             if any(w in user_text for w in words):
                 if any(w in name for w in words):
                     score += 3
-
-        # highlight
-        highlight = p.get("highlight", "")
-        if any(word in highlight for word in user_text.split()):
-            score += 2
 
         scores[name] = score
 
@@ -82,89 +80,111 @@ def smart_search(user_text):
 
 
 # =========================
-# 🎨 FLEX MESSAGE TOP 3
+# 📍 Filter ร้านอาหาร
 # =========================
-def create_flex_top3(results):
+def get_food():
+    return [name for name, p in places.items() if p.get("type") == "food"]
 
-    bubbles = []
 
-    for name, score in results[:3]:
+# =========================
+# 📍 ส่งรายละเอียดสถานที่
+# =========================
+def send_place_detail(line_bot_api, event, name):
 
-        place = places[name]
+    place = places[name]
 
-        bubble = {
-            "type": "bubble",
-            "hero": {
-                "type": "image",
-                "url": place.get("image"),
-                "size": "full",
-                "aspectRatio": "20:13",
-                "aspectMode": "cover"
-            },
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": name,
-                        "weight": "bold",
-                        "size": "lg"
-                    },
-                    {
-                        "type": "text",
-                        "text": place.get("highlight", "-"),
-                        "wrap": True,
-                        "size": "sm"
-                    },
-                    {
-                        "type": "text",
-                        "text": f"⏰ {place.get('time','-')}",
-                        "size": "sm"
-                    }
-                ]
-            },
-            "footer": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "button",
-                        "style": "primary",
-                        "action": {
-                            "type": "uri",
-                            "label": "🧭 นำทาง",
-                            "uri": place.get("map")
-                        }
-                    }
-                ]
-            }
-        }
+    line_bot_api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                ImageMessage(
+                    original_content_url=place["image"],
+                    preview_image_url=place["image"]
+                ),
+                TextMessage(
+                    text=f"""
+📍 {name}
 
-        bubbles.append(bubble)
+⭐ {place.get('highlight','-')}
+⏰ {place.get('time','-')}
+📍 {place.get('map','-')}
+""",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label="🔙 กลับเมนู", text="เมนู")),
+                            QuickReplyItem(action=MessageAction(label="📍 สถานที่อื่น", text="สถานที่ท่องเที่ยว"))
+                        ]
+                    )
+                )
+            ]
+        )
+    )
 
-    return {
-        "type": "carousel",
-        "contents": bubbles
-    }
+
+# =========================
+# 📍 ส่งรายละเอียดกิจกรรม
+# =========================
+def send_activity_detail(line_bot_api, event, name):
+
+    act = activities[name]
+
+    line_bot_api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                ImageMessage(
+                    original_content_url=act["image"],
+                    preview_image_url=act["image"]
+                ),
+                TextMessage(
+                    text=f"""
+🏨 {name}
+
+⭐ {act.get('highlight','-')}
+⏰ {act.get('time','-')}
+📍 {act.get('map','-')}
+""",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label="🔙 กลับเมนู", text="เมนู"))
+                        ]
+                    )
+                )
+            ]
+        )
+    )
 
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
 
     text = event.message.text.strip()
+    user_id = event.source.user_id
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
 
         # =========================
-        # 🏝 สถานที่ท่องเที่ยว
+        # 🔙 เมนู
         # =========================
-        if text in ["สถานที่เที่ยว", "สถานที่ท่องเที่ยว"]:
+        if text == "เมนู":
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="พิมพ์ 'สถานที่ท่องเที่ยว' เพื่อเริ่ม")]
+                )
+            )
+
+        # =========================
+        # 🍜 FOOD
+        # =========================
+        elif text.lower() in ["food", "ร้านอาหาร", "อาหาร"]:
+
+            food_list = get_food()
 
             items = [
                 QuickReplyItem(action=MessageAction(label=name, text=name))
-                for name in places
+                for name in food_list
             ]
 
             line_bot_api.reply_message(
@@ -172,7 +192,7 @@ def handle_message(event):
                     reply_token=event.reply_token,
                     messages=[
                         TextMessage(
-                            text="📍 เลือกสถานที่ในท่ายาง",
+                            text="🍜 เลือกร้านอาหาร",
                             quick_reply=QuickReply(items=items)
                         )
                     ]
@@ -180,13 +200,13 @@ def handle_message(event):
             )
 
         # =========================
-        # 📍 แผนที่ 2 ชั้น
+        # 🏨 ACTIVITY
         # =========================
-        elif text == "แผนที่ท่ายาง":
+        elif text.lower() in ["activity", "กิจกรรม"]:
 
             items = [
-                QuickReplyItem(action=MessageAction(label="🗺 แผนที่รวม", text="แผนที่รวม")),
-                QuickReplyItem(action=MessageAction(label="📍 รายสถานที่", text="แผนที่รายสถานที่")),
+                QuickReplyItem(action=MessageAction(label=name, text=f"act_{name}"))
+                for name in activities
             ]
 
             line_bot_api.reply_message(
@@ -194,27 +214,32 @@ def handle_message(event):
                     reply_token=event.reply_token,
                     messages=[
                         TextMessage(
-                            text="📍 เลือกประเภทแผนที่",
+                            text="🏨 เลือกกิจกรรม",
                             quick_reply=QuickReply(items=items)
                         )
                     ]
                 )
             )
 
-        elif text == "แผนที่รวม":
-            line_bot_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[
-                        TextMessage(text="📍 https://maps.google.com/?q=Tha+Yang+Phetchaburi")
-                    ]
-                )
-            )
+        elif text.startswith("act_"):
+            name = text.replace("act_", "")
+            if name in activities:
+                send_activity_detail(line_bot_api, event, name)
 
-        elif text == "แผนที่รายสถานที่":
+        # =========================
+        # 📍 สถานที่
+        # =========================
+        elif text in places:
+            send_place_detail(line_bot_api, event, text)
 
+        elif text.startswith("detail_"):
+            name = text.replace("detail_", "")
+            if name in places:
+                send_place_detail(line_bot_api, event, name)
+
+        elif text in ["สถานที่เที่ยว", "สถานที่ท่องเที่ยว"]:
             items = [
-                QuickReplyItem(action=MessageAction(label=name, text=f"map_{name}"))
+                QuickReplyItem(action=MessageAction(label=name, text=name))
                 for name in places
             ]
 
@@ -230,73 +255,33 @@ def handle_message(event):
                 )
             )
 
-        elif text.startswith("map_"):
-
-            name = text.replace("map_", "")
-
-            if name in places:
-                line_bot_api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[
-                            TextMessage(text=f"📍 {name}\n{places[name].get('map','-')}")
-                        ]
-                    )
-                )
-
         # =========================
-        # 📍 แสดงข้อมูลสถานที่
+        # 🤖 SMART (ถาม → ใช่)
         # =========================
-        elif text in places:
+        elif text == "ใช่":
+            if user_id in user_state:
+                send_place_detail(line_bot_api, event, user_state[user_id])
 
-            place = places[text]
-
-            reply_text = f"""
-📍 {text}
-
-⭐ {place.get('highlight','-')}
-⏰ {place.get('time','-')}
-📍 {place.get('map','-')}
-"""
-
-            messages = []
-
-            if place.get("image"):
-                messages.append(
-                    ImageMessage(
-                        original_content_url=place["image"],
-                        preview_image_url=place["image"]
-                    )
-                )
-
-            messages.append(TextMessage(text=reply_text))
-
-            line_bot_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=messages
-                )
-            )
-
-        # =========================
-        # 🤖 SMART REPLY (TOP 3)
-        # =========================
         else:
 
             results = smart_search(text)
-            top_score = results[0][1]
+            best_name, best_score = results[0]
 
-            if top_score > 0:
-
-                flex = create_flex_top3(results)
+            if best_score > 0:
+                user_state[user_id] = best_name
 
                 line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
                         messages=[
-                            FlexMessage(
-                                alt_text="แนะนำสถานที่ท่องเที่ยว",
-                                contents=flex
+                            TextMessage(
+                                text=f"คุณหมายถึง {best_name} ใช่ไหม",
+                                quick_reply=QuickReply(
+                                    items=[
+                                        QuickReplyItem(action=MessageAction(label="ใช่", text="ใช่")),
+                                        QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="ไม่ใช่"))
+                                    ]
+                                )
                             )
                         ]
                     )
@@ -307,7 +292,7 @@ def handle_message(event):
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
                         messages=[
-                            TextMessage(text="ลองพิมพ์ เช่น 'ไปวัดไหนดี' หรือ 'มีร้านอาหารแนะนำไหม'")
+                            TextMessage(text="ลองพิมพ์ เช่น 'ไปวัดไหนดี' หรือ 'หิวแล้ว'")
                         ]
                     )
                 )
