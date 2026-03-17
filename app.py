@@ -38,7 +38,10 @@ def webhook():
 
     return "OK"
 
-# 🔥 เก็บ history
+
+# =========================
+# 🔥 STATE
+# =========================
 user_state = {}
 
 def push_state(user_id, state):
@@ -51,16 +54,7 @@ def pop_state(user_id):
     return "menu"
 
 # =========================
-# 🧠 SMART SEARCH
-# =========================
-def smart_search(text):
-    for name in places:
-        if name in text:
-            return name
-    return None
-
-# =========================
-# 📍 เมนูหลัก
+# 📍 MAIN MENU
 # =========================
 def send_main_menu(api, event):
     push_state(event.source.user_id, "menu")
@@ -84,9 +78,6 @@ def send_main_menu(api, event):
         )
     )
 
-# =========================
-# 🔙 ปุ่ม
-# =========================
 def back_buttons():
     return [
         QuickReplyItem(action=MessageAction(label="🔙 กลับ", text="back")),
@@ -99,15 +90,26 @@ def back_buttons():
 def send_places(api, event):
     push_state(event.source.user_id, "travel")
 
-    items = [
-        QuickReplyItem(action=MessageAction(label=name, text=f"place_{name}"))
-        for name in places
-    ] + back_buttons()
+    names = list(places.keys())
+    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[TextMessage(text="📍 เลือกสถานที่", quick_reply=QuickReply(items=items))]
+            messages=[
+                TextMessage(
+                    text=f"📍 สถานที่ท่องเที่ยว\n\n{text_list}\n\n👉 พิมพ์ชื่อ หรือกดเลือกด้านล่าง"
+                ),
+                TextMessage(
+                    text="เลือกสถานที่ 👇",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label=n, text=f"place_{n}"))
+                            for n in names[:10]
+                        ] + back_buttons()
+                    )
+                )
+            ]
         )
     )
 
@@ -143,28 +145,49 @@ def send_food(api, event, place=None):
     push_state(event.source.user_id, "food")
 
     if place and place in foods:
-        items = [
-            QuickReplyItem(action=MessageAction(label=f["name"], text=f["map"]))
-            for f in foods[place]
-        ] + back_buttons()
+        food_list = foods[place]
+        text_list = "\n".join([f"{i+1}. {f['name']}" for i, f in enumerate(food_list)])
 
         api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=f"🍜 {place}", quick_reply=QuickReply(items=items))]
+                messages=[
+                    TextMessage(
+                        text=f"🍜 อาหารที่ {place}\n\n{text_list}"
+                    ),
+                    TextMessage(
+                        text="เลือกร้าน 👇",
+                        quick_reply=QuickReply(
+                            items=[
+                                QuickReplyItem(action=MessageAction(label=f["name"], text=f["map"]))
+                                for f in food_list[:10]
+                            ] + back_buttons()
+                        )
+                    )
+                ]
             )
         )
     else:
-        items = []
-        for p in foods:
-            items.append(QuickReplyItem(action=MessageAction(label=p, text=f"food_{p}")))
-
-        items += back_buttons()
+        names = list(foods.keys())
+        text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
 
         api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text="🍜 เลือกสถานที่กิน", quick_reply=QuickReply(items=items))]
+                messages=[
+                    TextMessage(
+                        text=f"🍜 เลือกสถานที่กิน\n\n{text_list}"
+                    ),
+                    TextMessage(
+                        text="เลือก 👇",
+                        quick_reply=QuickReply(
+                            items=[
+                                QuickReplyItem(action=MessageAction(label=n, text=f"food_{n}"))
+                                for n in names[:10]
+                            ] + back_buttons()
+                        )
+                    )
+                ]
             )
         )
 
@@ -175,26 +198,53 @@ def send_activity(api, event, place=None):
     push_state(event.source.user_id, "activity")
 
     if place and place in activities:
-        items = [
-            QuickReplyItem(action=MessageAction(label=a["name"], text=f"act_detail_{a['name']}"))
-            for a in activities[place]
-        ] + back_buttons()
-    else:
-        items = [
-            QuickReplyItem(action=MessageAction(label=p, text=f"act_{p}"))
-            for p in activities
-        ] + back_buttons()
+        act_list = activities[place]
+        text_list = "\n".join([f"{i+1}. {a['name']}" for i, a in enumerate(act_list)])
 
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[TextMessage(text="🏨 เลือกกิจกรรม", quick_reply=QuickReply(items=items))]
+        api.reply_message(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[
+                    TextMessage(
+                        text=f"🏨 กิจกรรมที่ {place}\n\n{text_list}"
+                    ),
+                    TextMessage(
+                        text="เลือกกิจกรรม 👇",
+                        quick_reply=QuickReply(
+                            items=[
+                                QuickReplyItem(action=MessageAction(label=a["name"], text=f"act_detail_{a['name']}"))
+                                for a in act_list[:10]
+                            ] + back_buttons()
+                        )
+                    )
+                ]
+            )
         )
-    )
+    else:
+        names = list(activities.keys())
+        text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
+
+        api.reply_message(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[
+                    TextMessage(
+                        text=f"🏨 เลือกสถานที่ทำกิจกรรม\n\n{text_list}"
+                    ),
+                    TextMessage(
+                        text="เลือก 👇",
+                        quick_reply=QuickReply(
+                            items=[
+                                QuickReplyItem(action=MessageAction(label=n, text=f"act_{n}"))
+                                for n in names[:10]
+                            ] + back_buttons()
+                        )
+                    )
+                ]
+            )
+        )
 
 def send_activity_detail(api, event, name):
-    push_state(event.source.user_id, f"act_detail_{name}")
-
     for p in activities:
         for a in activities[p]:
             if a["name"] == name:
@@ -218,21 +268,24 @@ def send_activity_detail(api, event, name):
 def send_map(api, event):
     push_state(event.source.user_id, "map")
 
-    items = [
-        QuickReplyItem(action=MessageAction(label="📍 ไปท่ายาง", text="https://maps.google.com/?q=ท่ายาง"))
-    ]
-
-    for p in places:
-        items.append(
-            QuickReplyItem(action=MessageAction(label=p, text=places[p]["map"]))
-        )
-
-    items += back_buttons()
+    names = list(places.keys())
+    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[TextMessage(text="🗺 เลือกแผนที่", quick_reply=QuickReply(items=items))]
+            messages=[
+                TextMessage(text=f"🗺 แผนที่\n\n{text_list}"),
+                TextMessage(
+                    text="เลือกสถานที่ 👇",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label=n, text=places[n]["map"]))
+                            for n in names[:10]
+                        ] + back_buttons()
+                    )
+                )
+            ]
         )
     )
 
@@ -263,8 +316,6 @@ def handle_message(event):
                 send_activity(api, event)
             elif last == "map":
                 send_map(api, event)
-            elif last.startswith("place_"):
-                send_place_detail(api, event, last.replace("place_", ""))
 
         elif text == "travel":
             send_places(api, event)
@@ -281,11 +332,11 @@ def handle_message(event):
         elif text == "activity":
             send_activity(api, event)
 
-        elif text.startswith("act_detail_"):
-            send_activity_detail(api, event, text.replace("act_detail_", ""))
-
         elif text.startswith("act_"):
             send_activity(api, event, text.replace("act_", ""))
+
+        elif text.startswith("act_detail_"):
+            send_activity_detail(api, event, text.replace("act_detail_", ""))
 
         elif text == "map":
             send_map(api, event)
@@ -299,11 +350,7 @@ def handle_message(event):
             )
 
         else:
-            found = smart_search(text)
-            if found:
-                send_place_detail(api, event, found)
-            else:
-                send_main_menu(api, event)
+            send_main_menu(api, event)
 
 
 if __name__ == "__main__":
