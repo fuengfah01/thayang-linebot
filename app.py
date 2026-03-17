@@ -17,6 +17,27 @@ CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
+# จำสถานะ user
+user_state = {}
+
+
+@app.route("/")
+def home():
+    return "LINE BOT RUNNING"
+
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    body = request.get_data(as_text=True)
+    signature = request.headers.get("X-Line-Signature", "")
+
+    try:
+        handler.handle(body, signature)
+    except Exception as e:
+        print("Webhook error:", e)
+
+    return "OK"
+
 # 🔥 เก็บ history
 user_state = {}
 
