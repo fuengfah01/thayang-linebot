@@ -1,4 +1,4 @@
-from flask import Flask, request, abort
+from flask import Flask, request
 from linebot.v3.messaging import (
     MessagingApi,
     Configuration,
@@ -18,8 +18,8 @@ import os
 
 app = Flask(__name__)
 
-CHANNEL_ACCESS_TOKEN = "4daQ2JUnEe+vEmbDJhOmn48fWc7d/Kb6+iWXIm05H8ngOFqDPLyNpgdTO58cKvHyfcL/q/gytkIljJiMSjAQCvN5wmahGaLKoVocuepLo5tyQq7q33YfsPZPhxpO8kPOrpnECFRdZPB0JjHKaKaPOQdB04t89/1O/w1cDnyilFU="
-CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
+CHANNEL_ACCESS_TOKEN = "ใส่ของฟ้า"
+CHANNEL_SECRET = "ใส่ของฟ้า"
 
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
@@ -32,11 +32,8 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
-
-    print("BODY:", body)
 
     try:
         handler.handle(body, signature)
@@ -52,13 +49,12 @@ def handle_message(event):
     text = event.message.text.strip()
 
     with ApiClient(configuration) as api_client:
-
         line_bot_api = MessagingApi(api_client)
 
         # -------------------------
-        # แสดงรายการสถานที่
+        # 🏝 สถานที่ท่องเที่ยว (รองรับ 2 คำ)
         # -------------------------
-        if text == "สถานที่ท่องเที่ยว":
+        if text in ["สถานที่เที่ยว", "สถานที่ท่องเที่ยว"]:
 
             items = []
 
@@ -85,7 +81,55 @@ def handle_message(event):
             )
 
         # -------------------------
-        # ถ้าพิมพ์ชื่อสถานที่ตรง
+        # 📍 แผนที่ท่ายาง
+        # -------------------------
+        elif text == "แผนที่ท่ายาง":
+
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text="📍 แผนที่อำเภอท่ายาง\nhttps://maps.google.com/?q=Thayang"
+                        )
+                    ]
+                )
+            )
+
+        # -------------------------
+        # 🎯 กิจกรรม
+        # -------------------------
+        elif text == "กิจกรรม":
+
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text="🎯 กิจกรรมในท่ายาง\n- ไหว้พระ\n- เที่ยววัด\n- ชิมอาหารพื้นบ้าน\n- ถ่ายรูปธรรมชาติ"
+                        )
+                    ]
+                )
+            )
+
+        # -------------------------
+        # 🍜 ร้านอาหาร
+        # -------------------------
+        elif text == "ร้านอาหาร":
+
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text="🍜 ร้านอาหารแนะนำในท่ายาง (กำลังอัปเดต...)"
+                        )
+                    ]
+                )
+            )
+
+        # -------------------------
+        # 🏝 แสดงข้อมูลสถานที่
         # -------------------------
         elif text in places:
 
@@ -104,36 +148,8 @@ def handle_message(event):
 {place['map']}
 
 🧭 นำทาง
-กดลิงก์เพื่อเปิด Google Maps
+{place['map']}
 """
-
-#             reply_text = f"""
-# 📍 {text}
-
-# 📖 ประวัติความเป็นมา
-# {place.get('history','-')}
-
-# ⭐ จุดเด่นของสถานที่
-# {place.get('highlight','-')}
-
-# 🎯 กิจกรรมที่สามารถทำได้
-# {place.get('activities','-')}
-
-# 🏛 ความสำคัญทางวัฒนธรรม
-# {place.get('culture','-')}
-
-# 💡 คำแนะนำสำหรับผู้มาเยือน
-# {place.get('tips','-')}
-
-# ⏰ เวลาเปิดให้เข้าชม
-# {place.get('time','-')}
-
-# 📍 ที่อยู่
-# {place.get('address','-')}
-
-# 🗺 แผนที่
-# {place.get('map','-')}
-# """
 
             line_bot_api.reply_message(
                 ReplyMessageRequest(
@@ -149,26 +165,23 @@ def handle_message(event):
             )
 
         # -------------------------
-        # ค้นหาคำใกล้เคียง
+        # 🔍 ค้นหาคำใกล้เคียง
         # -------------------------
         else:
 
             match = difflib.get_close_matches(text, places.keys(), n=1, cutoff=0.5)
 
             if match:
-
                 name = match[0]
                 place = places[name]
 
                 reply = f"""
 คุณหมายถึง {name} ใช่ไหม
 
-{place['history']}
+{place.get('highlight','')}
 """
-
             else:
-
-                reply = """พิมพ์คำว่า สถานที่ท่องเที่ยว เพื่อดูสถานที่ในท่ายาง"""
+                reply = "พิมพ์คำว่า 'สถานที่เที่ยว' เพื่อดูสถานที่ในท่ายาง"
 
             line_bot_api.reply_message(
                 ReplyMessageRequest(
@@ -179,7 +192,5 @@ def handle_message(event):
 
 
 if __name__ == "__main__":
-
     port = int(os.environ.get("PORT", 10000))
-
     app.run(host="0.0.0.0", port=port)
