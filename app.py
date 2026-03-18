@@ -91,45 +91,47 @@ def fuzzy_search_place(text):
 def send_place_detail(api, event, name):
     p = places[name]
 
-    # 🔥 สร้าง bubble 4 อัน (แต่ละรูป = 1 card)
-    bubbles = []
-
-    for img in p["images"]:
-        bubble = Bubble(
+    flex = FlexMessage(
+        alt_text=name,
+        contents=Bubble(
             hero=ImageComponent(
-                url=img,
+                url=p["images"][0],  # ✅ เอาแค่รูปแรก
                 size="full",
                 aspect_ratio="20:13",
                 aspect_mode="cover"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                contents=[
+                    TextComponent(
+                        text=name,
+                        weight="bold",
+                        size="lg"
+                    ),
+                    TextComponent(
+                        text=f"📜 {p['history']}",
+                        wrap=True,
+                        size="sm"
+                    ),
+                    TextComponent(
+                        text=f"⭐ {p['highlight']}",
+                        wrap=True,
+                        size="sm"
+                    ),
+                    TextComponent(
+                        text=f"⏰ {p['time']}",
+                        size="sm",
+                        color="#888888"
+                    )
+                ]
             )
         )
-        bubbles.append(bubble)
-
-    # 🔥 carousel (เลื่อนรูปได้)
-    flex = FlexMessage(
-        alt_text=f"{name}",
-        contents=Carousel(contents=bubbles)
-    )
-
-    # 🔥 ข้อมูลข้อความ
-    text = TextMessage(
-        text=f"""📍 {name}
-
-📜 ประวัติ:
-{p['history']}
-
-⭐ จุดเด่น:
-{p['highlight']}
-
-⏰ เวลา:
-{p['time']}
-"""
     )
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[flex, text]
+            messages=[flex]
         )
     )
 
