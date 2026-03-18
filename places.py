@@ -3,93 +3,93 @@ BASE_URL = "https://thayang-linebot.onrender.com/"
 places = {
 
     "วัดท่าคอย": {
-        "images": [
-            f"{BASE_URL}image/wat1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/wat1.jpg"],
         "history": "วัดเก่าแก่ของอำเภอท่ายาง เป็นศูนย์รวมจิตใจของชุมชนมานานกว่า 100 ปี",
         "highlight": "อุโบสถเก่าแก่ + อุทยานปลา",
         "time": "08:00 - 17:00",
-        "map": "https://maps.google.com/?q=วัดท่าคอย"
+        "map": "https://maps.google.com/?q=วัดท่าคอย",
+        "keywords": ["วัด", "ไหว้พระ", "ทำบุญ"],
+        "synonyms": ["วัดท่าคอย", "wat tha koi"]
     },
 
     "อุโบสถ 100 ปี": {
-        "images": [
-            f"{BASE_URL}image/ubosot1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/ubosot1.jpg"],
         "history": "อุโบสถโบราณอายุกว่า 100 ปี ภายในมีพระประธานสำคัญ",
         "highlight": "ศิลปะไทยโบราณ",
         "time": "08:00 - 17:00",
-        "map": "https://maps.google.com/?q=อุโบสถ100ปี ท่ายาง"
+        "map": "https://maps.google.com/?q=อุโบสถ100ปี ท่ายาง",
+        "keywords": ["โบสถ์", "วัดเก่า", "ถ่ายรูป"],
+        "synonyms": ["อุโบสถ100ปี", "ubosot 100"]
     },
 
     "อุทยานปลาวัดท่าคอย": {
-        "images": [
-            f"{BASE_URL}image/fish1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/fish1.jpg"],
         "history": "แหล่งน้ำที่มีปลาจำนวนมาก",
         "highlight": "ให้อาหารปลาได้",
         "time": "08:00 - 18:00",
-        "map": "https://maps.google.com/?q=อุทยานปลาวัดท่าคอย"
+        "map": "https://maps.google.com/?q=อุทยานปลาวัดท่าคอย",
+        "keywords": ["ปลา", "ให้อาหารปลา", "ครอบครัว"],
+        "synonyms": ["บ่อปลา", "ปลาเยอะ"]
     },
 
     "ตลาดสดท่ายาง": {
-        "images": [
-            f"{BASE_URL}image/market1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/market1.jpg"],
         "history": "ตลาดชุมชนเก่าแก่",
         "highlight": "ของกินเยอะมาก",
         "time": "06:00 - 14:00",
-        "map": "https://maps.google.com/?q=ตลาดสดท่ายาง"
+        "map": "https://maps.google.com/?q=ตลาดสดท่ายาง",
+        "keywords": ["ตลาด", "ของกิน", "เดินเล่น", "ของอร่อย"],
+        "synonyms": ["ตลาดท่ายาง", "market thayang"]
     },
 
     "ร้านผัดไทย 100 ปี": {
-        "images": [
-            f"{BASE_URL}image/padthai1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/padthai1.jpg"],
         "history": "ร้านผัดไทยสูตรโบราณ",
         "highlight": "รสชาติดั้งเดิม",
         "time": "09:00 - 18:00",
-        "map": "https://maps.google.com/?q=ผัดไทย100ปี ท่ายาง"
+        "map": "https://maps.google.com/?q=ผัดไทย100ปี ท่ายาง",
+        "keywords": ["ผัดไทย", "ร้านอาหาร", "ของกิน"],
+        "synonyms": ["ผัดไทย100ปี", "padthai 100"]
     },
 
     "ร้านทองม้วนแม่เล็ก": {
-        "images": [
-            f"{BASE_URL}image/tong1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/tong1.jpg"],
         "history": "ร้านขนมไทยชื่อดัง",
         "highlight": "ทองม้วนกรอบหอม",
         "time": "08:00 - 17:00",
-        "map": "https://maps.google.com/?q=ทองม้วนแม่เล็ก"
+        "map": "https://maps.google.com/?q=ทองม้วนแม่เล็ก",
+        "keywords": ["ขนม", "ของฝาก", "ของหวาน"],
+        "synonyms": ["ทองม้วน", "แม่เล็ก"]
     },
 
     "ศาลเจ้าพ่อกวนอู": {
-        "images": [
-            f"{BASE_URL}image/guan1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/guan1.jpg"],
         "history": "ศาลเจ้าจีนเก่าแก่",
         "highlight": "รูปปั้นกวนอู",
         "time": "08:00 - 17:00",
-        "map": "https://maps.google.com/?q=ศาลเจ้าพ่อกวนอู ท่ายาง"
+        "map": "https://maps.google.com/?q=ศาลเจ้าพ่อกวนอู ท่ายาง",
+        "keywords": ["ศาลเจ้า", "ไหว้เจ้า", "จีน"],
+        "synonyms": ["กวนอู", "ศาลกวนอู"]
     },
 
     "ข้าวแช่แม่เล็ก สกิดใจ": {
-        "images": [
-            f"{BASE_URL}image/kaoch1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/kaoch1.jpg"],
         "history": "ร้านข้าวแช่ชื่อดังของเพชรบุรี",
         "highlight": "อาหารหน้าร้อน",
         "time": "09:00 - 16:00",
-        "map": "https://maps.google.com/?q=ข้าวแช่แม่เล็ก"
+        "map": "https://maps.google.com/?q=ข้าวแช่แม่เล็ก",
+        "keywords": ["ข้าวแช่", "อาหารไทย", "ของกิน"],
+        "synonyms": ["แม่เล็ก", "ข้าวแช่"]
     },
 
     "ศาลเจ้าแม่ทับทิม": {
-        "images": [
-            f"{BASE_URL}image/tubtim1.jpg"
-        ],
+        "images": [f"{BASE_URL}image/tubtim1.jpg"],
         "history": "ศาลเจ้าสำคัญของชุมชน",
         "highlight": "สถาปัตยกรรมจีน",
         "time": "08:00 - 17:00",
-        "map": "https://maps.google.com/?q=ศาลเจ้าแม่ทับทิม ท่ายาง"
+        "map": "https://maps.google.com/?q=ศาลเจ้าแม่ทับทิม ท่ายาง",
+        "keywords": ["ศาลเจ้า", "จีน", "ไหว้เจ้า"],
+        "synonyms": ["เจ้าแม่ทับทิม", "ทับทิม"]
     }
 
 }
