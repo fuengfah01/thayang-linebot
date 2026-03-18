@@ -7,7 +7,6 @@ from rapidfuzz import process
 from places import places
 from info import info
 
-# import difflib
 import os
 
 app = Flask(__name__)
@@ -78,8 +77,7 @@ def fuzzy_search_place(text):
 
     if result:
         word, score, _ = result
-
-        if score > 60:  # ปรับได้ (50 = หลวม, 80 = เข้ม)
+        if score > 60:
             return mapping[word]
 
     return None
@@ -93,9 +91,8 @@ def send_place_detail(api, event, name):
 
     # 🔥 สร้าง bubble 4 อัน (แต่ละรูป = 1 card)
     bubbles = []
-
     for img in p["images"]:
-        bubble = Bubble(
+        bubble = BubbleContainer(
             hero=ImageComponent(
                 url=img,
                 size="full",
@@ -108,7 +105,7 @@ def send_place_detail(api, event, name):
     # 🔥 carousel (เลื่อนรูปได้)
     flex = FlexMessage(
         alt_text=f"{name}",
-        contents=Carousel(contents=bubbles)
+        contents=CarouselContainer(contents=bubbles)
     )
 
     # 🔥 ข้อมูลข้อความ
@@ -229,7 +226,7 @@ def send_places(api, event):
                             QuickReplyItem(
                                 action=MessageAction(
                                     label=name,
-                                    text=name  # 👈 กดแล้วส่งชื่อไป -> เข้าเงื่อนไขด้านล่าง
+                                    text=name
                                 )
                             )
                             for name in names
@@ -239,12 +236,14 @@ def send_places(api, event):
             ]
         )
     )
+
 # =========================
 # 📩 HANDLE
 # =========================
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     text = event.message.text.strip()
+    match = None  # 🔹 กำหนดค่าเริ่มต้น
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
@@ -260,7 +259,6 @@ def handle_message(event):
 
         elif text.startswith("map_"):
             name = text.replace("map_", "")
-
             if name == "all":
                 url = "https://maps.google.com"
             else:
@@ -292,7 +290,8 @@ def handle_message(event):
             # 🔥 fuzzy search
             match = fuzzy_search_place(text)
 
-        if match:
+        # 🔹 ตรวจสอบ match ก่อนใช้งาน
+        if match is not None:
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
