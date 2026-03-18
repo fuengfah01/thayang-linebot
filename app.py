@@ -96,35 +96,24 @@ def send_places(api, event):
 def send_place_detail(api, event, name):
     p = places[name]
 
-    # ✅ ตอบทันที กัน timeout
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(text=f"📍 กำลังโหลดข้อมูล {name}...")
-            ]
-        )
-    )
-
-    # 🔥 สร้าง carousel รูป
     bubbles = []
-    for img in p["images"]:
-        bubble = Bubble(
-            hero=ImageComponent(
-                url=img,
-                size="full",
-                aspect_ratio="20:13",
-                aspect_mode="cover"
+    for img in p["images"][:2]:  # ✅ จำกัด 2 รูป
+        bubbles.append(
+            Bubble(
+                hero=ImageComponent(
+                    url=img,
+                    size="full",
+                    aspect_ratio="20:13",
+                    aspect_mode="cover"
+                )
             )
         )
-        bubbles.append(bubble)
 
     flex = FlexMessage(
         alt_text=name,
         contents=Carousel(contents=bubbles)
     )
 
-    # 🔥 ข้อความรายละเอียด
     text_msg = TextMessage(
         text=f"""📍 {name}
 
@@ -139,10 +128,9 @@ def send_place_detail(api, event, name):
 """
     )
 
-    # ✅ ส่งทีหลัง (ไม่ timeout)
-    api.push_message(
-        PushMessageRequest(
-            to=event.source.user_id,
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
             messages=[flex, text_msg]
         )
     )
