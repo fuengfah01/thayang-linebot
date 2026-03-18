@@ -216,25 +216,29 @@ def send_info(api, event):
     )
 
 def send_places(api, event):
-    names = list(places.keys())
-
-    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
+    names = list(places.keys())[:9]  # เอา 9 ที่
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
-                    text=f"""📍 สถานที่ท่องเที่ยว
-
-{text_list}
-
-👉 พิมพ์ชื่อสถานที่เพื่อดูรายละเอียด"""
+                    text="📍 เลือกสถานที่ท่องเที่ยว",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(
+                                action=MessageAction(
+                                    label=name,
+                                    text=name  # 👈 กดแล้วส่งชื่อไป -> เข้าเงื่อนไขด้านล่าง
+                                )
+                            )
+                            for name in names
+                        ]
+                    )
                 )
             ]
         )
     )
-
 # =========================
 # 📩 HANDLE
 # =========================
@@ -288,10 +292,26 @@ def handle_message(event):
             # 🔥 fuzzy search
             match = fuzzy_search_place(text)
 
-            if match:
-                send_place_detail(api, event, match)
-            else:
-                send_places(api, event)
+        if match:
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text=f"คุณหมายถึง {match} ใช่ไหม",
+                            quick_reply=QuickReply(
+                                items=[
+                                    QuickReplyItem(action=MessageAction(label="ใช่", text=f"yes_{match}")),
+                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="menu"))
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        elif text.startswith("yes_"):
+            name = text.replace("yes_", "")
+            send_place_detail(api, event, name)
 
 # =========================
 # 🚀 RUN
