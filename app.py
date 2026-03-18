@@ -1,5 +1,8 @@
 from flask import Flask, request, send_from_directory
-from linebot.v3.messaging import *
+import os
+from rapidfuzz import process
+
+# นำเข้าคลาสหลักที่จำเป็นสำหรับ Messaging API
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
@@ -10,10 +13,8 @@ from linebot.v3.messaging import (
     QuickReply,
     QuickReplyItem,
     MessageAction,
-    URIAction
-)
-# เพิ่มบรรทัดนี้เพื่อเรียกใช้คลาสสำหรับสร้าง Flex Message
-from linebot.v3.messaging.models import (
+    URIAction,
+    # นำเข้าคลาสสำหรับสร้าง Flex Message ไว้ที่นี่ที่เดียวเพื่อความเสถียร
     Bubble, 
     ImageComponent, 
     BoxComponent, 
@@ -24,16 +25,13 @@ from linebot.v3.messaging.models import (
 )
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
-from rapidfuzz import process
 
 from places import places
 from info import info
 
-import os
-
 app = Flask(__name__)
 
-# แนะนำให้ใช้ Environment Variable เพื่อความปลอดภัย
+# แนะนำให้ใช้ Environment Variable ในหน้า Render Settings แทนการใส่ในโค้ด
 CHANNEL_ACCESS_TOKEN = "4daQ2JUnEe+vEmbDJhOmn48fWc7d/Kb6+iWXIm05H8ngOFqDPLyNpgdTO58cKvHyfcL/q/gytkIljJiMSjAQCvN5wmahGaLKoVocuepLo5tyQq7q33YfsPZPhxpO8kPOrpnECFRdZPB0JjHKaKaPOQdB04t89/1O/w1cDnyilFU="
 CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
 
@@ -75,15 +73,14 @@ def fuzzy_search_place(text):
     result = process.extractOne(text, all_choices)
     if result:
         word, score, _ = result
-        if score > 70: # ปรับ score ขึ้นเล็กน้อยเพื่อความแม่นยำ
+        if score > 70:
             return mapping[word]
     return None
 
 def send_places(api, event):
-    names = list(places.keys())[:12] # เพิ่มจำนวนที่แสดงได้
+    names = list(places.keys())[:12]
     items = []
-    for i, n in enumerate(names):
-        # เปลี่ยนเป็นส่งชื่อสถานที่ตรงๆ จะลดโอกาส Error เรื่อง Index ครับ
+    for n in names:
         items.append(QuickReplyItem(action=MessageAction(label=n[:20], text=n)))
     
     api.reply_message(ReplyMessageRequest(
@@ -141,7 +138,6 @@ def send_map(api, event):
     ))
 
 def send_activity(api, event):
-    # (Logic เดิมของคุณ ดีอยู่แล้วครับ)
     categories = [
         {"emoji": "🙏", "title": "ไหว้พระ / ทำบุญ", "color": "#F5A623", "places_list": ["• วัดท่าคอย", "• ศาลเจ้าพ่อกวนอู"]},
         {"emoji": "📸", "title": "ถ่ายรูปวัฒนธรรม", "color": "#7B68EE", "places_list": ["• อุโบสถ 100 ปี", "• ตลาดเก่า"]},
@@ -184,23 +180,16 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        # 1. ตรวจสอบคำหลักจาก Rich Menu
         if text in ["สถานที่ท่องเที่ยว", "travel"]:
             send_places(api, event)
-        
         elif text in ["แผนที่อำเภอท่ายาง", "แผนที่", "map"]:
             send_map(api, event)
-            
         elif text in ["กิจกรรม", "activity"]:
             send_activity(api, event)
-            
         elif text in ["เกี่ยวกับอำเภอท่ายาง", "info"]:
             send_info(api, event)
-
-        # 2. ตรวจสอบการเลือกจาก Quick Reply
-        elif text in places: # ถ้าข้อความที่ส่งมาคือชื่อสถานที่ตรงๆ
+        elif text in places:
             send_place_detail(api, event, text)
-
         elif text.startswith("map_"):
             suffix = text.replace("map_", "")
             if suffix == "all":
@@ -219,7 +208,6 @@ def handle_message(event):
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=f"🗺 เส้นทางไป {label}\n{url}")]
             ))
-
         elif text.startswith("info_"):
             key = text.replace("info_", "")
             if key in info:
@@ -227,14 +215,11 @@ def handle_message(event):
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=info[key])]
                 ))
-
-        # 3. ถ้าไม่ตรงเงื่อนไขข้างบน ให้ใช้ Fuzzy Search ค้นหา
         else:
             match = fuzzy_search_place(text)
             if match:
                 send_place_detail(api, event, match)
             else:
-                # ถ้าหาไม่เจอจริงๆ ให้ส่งเมนูสถานที่เริ่มต้น
                 send_places(api, event)
 
 if __name__ == "__main__":
