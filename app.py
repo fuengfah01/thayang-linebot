@@ -1,5 +1,27 @@
 from flask import Flask, request, send_from_directory
 from linebot.v3.messaging import *
+from linebot.v3.messaging import (
+    Configuration,
+    ApiClient,
+    MessagingApi,
+    ReplyMessageRequest,
+    TextMessage,
+    FlexMessage,
+    QuickReply,
+    QuickReplyItem,
+    MessageAction,
+    URIAction
+)
+# เพิ่มบรรทัดนี้เพื่อเรียกใช้คลาสสำหรับสร้าง Flex Message
+from linebot.v3.messaging.models import (
+    Bubble, 
+    ImageComponent, 
+    BoxComponent, 
+    TextComponent, 
+    SeparatorComponent, 
+    ButtonComponent,
+    Carousel
+)
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from rapidfuzz import process
