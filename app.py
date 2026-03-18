@@ -7,7 +7,6 @@ from rapidfuzz import process
 from places import places
 from info import info
 
-# import difflib
 import os
 
 app = Flask(__name__)
@@ -51,7 +50,7 @@ def webhook():
     return "OK"
 
 # =========================
-# 🧠 AI หาใกล้เคียง
+# 🧠 Fuzzy Search
 # =========================
 def fuzzy_search_place(text):
     text = text.lower()
@@ -60,16 +59,13 @@ def fuzzy_search_place(text):
     mapping = {}
 
     for name, data in places.items():
-        # ชื่อหลัก
         all_choices.append(name)
         mapping[name] = name
 
-        # keywords
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
 
-        # synonyms
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
@@ -78,15 +74,13 @@ def fuzzy_search_place(text):
 
     if result:
         word, score, _ = result
-
-        if score > 60:  # ปรับได้ (50 = หลวม, 80 = เข้ม)
+        if score > 60:
             return mapping[word]
 
     return None
-    
 
 # =========================
-# 📍 สถานที่
+# 📍 สถานที่ — แสดงรายการ (Quick Reply)
 # =========================
 def send_places(api, event):
     names = list(places.keys())[:9]
@@ -96,7 +90,7 @@ def send_places(api, event):
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
-                    text="📍 เลือกสถานที่ท่องเที่ยว",
+                    text="📍 เลือกสถานที่ท่องเที่ยวในอำเภอท่ายาง",
                     quick_reply=QuickReply(
                         items=[
                             QuickReplyItem(
@@ -108,8 +102,108 @@ def send_places(api, event):
             ]
         )
     )
+
 # =========================
-# 🗺 MAP
+# 📍 สถานที่ — แสดงรายละเอียด (Flex Message)
+# =========================
+def send_place_detail(api, event, name):
+    p = places[name]
+
+    flex = FlexMessage(
+        alt_text=name,
+        contents=Bubble(
+            hero=ImageComponent(
+                url=p["images"][0],
+                size="full",
+                aspect_ratio="20:13",
+                aspect_mode="cover"
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                spacing="sm",
+                contents=[
+                    TextComponent(
+                        text=name,
+                        weight="bold",
+                        size="xl",
+                        color="#1a1a1a"
+                    ),
+                    SeparatorComponent(margin="sm"),
+                    BoxComponent(
+                        layout="vertical",
+                        margin="md",
+                        spacing="sm",
+                        contents=[
+                            BoxComponent(
+                                layout="horizontal",
+                                contents=[
+                                    TextComponent(text="📜", flex=0, size="sm"),
+                                    TextComponent(
+                                        text=p["history"],
+                                        wrap=True,
+                                        size="sm",
+                                        color="#555555",
+                                        flex=1,
+                                        margin="sm"
+                                    )
+                                ]
+                            ),
+                            BoxComponent(
+                                layout="horizontal",
+                                contents=[
+                                    TextComponent(text="⭐", flex=0, size="sm"),
+                                    TextComponent(
+                                        text=p["highlight"],
+                                        wrap=True,
+                                        size="sm",
+                                        color="#555555",
+                                        flex=1,
+                                        margin="sm"
+                                    )
+                                ]
+                            ),
+                            BoxComponent(
+                                layout="horizontal",
+                                contents=[
+                                    TextComponent(text="⏰", flex=0, size="sm"),
+                                    TextComponent(
+                                        text=p["time"],
+                                        size="sm",
+                                        color="#888888",
+                                        flex=1,
+                                        margin="sm"
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            ),
+            footer=BoxComponent(
+                layout="vertical",
+                contents=[
+                    ButtonComponent(
+                        action=URIAction(
+                            label="🗺 ดูแผนที่",
+                            uri=p["map"]
+                        ),
+                        style="primary",
+                        color="#4A90D9"
+                    )
+                ]
+            )
+        )
+    )
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[flex]
+        )
+    )
+
+# =========================
+# 🗺 แผนที่
 # =========================
 def send_map(api, event):
     names = list(places.keys())[:9]
@@ -119,13 +213,16 @@ def send_map(api, event):
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
-                    text="🗺 เลือกสถานที่",
+                    text="🗺 เลือกสถานที่เพื่อดูเส้นทาง",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
-                            for n in names
+                            QuickReplyItem(
+                                action=MessageAction(label=n, text=f"map_{n}")
+                            ) for n in names
                         ] + [
-                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
+                            QuickReplyItem(
+                                action=MessageAction(label="แผนที่อำเภอ", text="map_all")
+                            )
                         ]
                     )
                 )
@@ -134,55 +231,136 @@ def send_map(api, event):
     )
 
 # =========================
-# 🏨 ACTIVITY
+# 🏃 กิจกรรม — Flex Carousel 4 หมวด
 # =========================
 def send_activity(api, event):
-    text = """🏨 กิจกรรมแนะนำ
+    categories = [
+        {
+            "emoji": "🙏",
+            "title": "ไหว้พระ / ทำบุญ",
+            "color": "#F5A623",
+            "places_list": [
+                "• วัดท่าคอย",
+                "• ศาลเจ้าพ่อกวนอู",
+                "• ศาลเจ้าแม่ทับทิม"
+            ]
+        },
+        {
+            "emoji": "📸",
+            "title": "ถ่ายรูปสถานที่วัฒนธรรม",
+            "color": "#7B68EE",
+            "places_list": [
+                "• วัดท่าคอย",
+                "• อุโบสถ 100 ปี",
+                "• ศาลเจ้าพ่อกวนอู",
+                "• ศาลเจ้าแม่ทับทิม"
+            ]
+        },
+        {
+            "emoji": "🐟",
+            "title": "ให้อาหารปลา",
+            "color": "#4A90D9",
+            "places_list": [
+                "• อุทยานปลาวัดท่าคอย"
+            ]
+        },
+        {
+            "emoji": "🍜",
+            "title": "ตะลอนกิน",
+            "color": "#E85D30",
+            "places_list": [
+                "• ตลาดสดท่ายาง",
+                "• ร้านทองม้วนแม่เล็ก",
+                "• ร้านผัดไทย 100 ปี",
+                "• ข้าวแช่แม่เล็ก สกิดใจ"
+            ]
+        }
+    ]
 
-🙏 ไหว้พระ
-- วัดท่าคอย
-- ศาลเจ้าพ่อกวนอู
-- ศาลเจ้าแม่ทับทิม
+    bubbles = []
+    for cat in categories:
+        place_texts = [
+            TextComponent(
+                text=p,
+                size="sm",
+                color="#555555",
+                wrap=True
+            ) for p in cat["places_list"]
+        ]
 
-📸 ถ่ายรูป
-- วัดท่าคอย
-- ศาลเจ้าพ่อกวนอู
-- ศาลเจ้าแม่ทับทิม
-- อุโบสถ 100 ปี
+        bubble = Bubble(
+            body=BoxComponent(
+                layout="vertical",
+                spacing="sm",
+                contents=[
+                    TextComponent(
+                        text=cat["emoji"],
+                        size="xxl",
+                        align="center"
+                    ),
+                    TextComponent(
+                        text=cat["title"],
+                        weight="bold",
+                        size="md",
+                        align="center",
+                        color=cat["color"],
+                        wrap=True
+                    ),
+                    SeparatorComponent(margin="md"),
+                    BoxComponent(
+                        layout="vertical",
+                        margin="md",
+                        spacing="xs",
+                        contents=place_texts
+                    )
+                ]
+            )
+        )
+        bubbles.append(bubble)
 
-🐟 ให้อาหารปลา
-- อุทยานปลาวัดท่าคอย
-
-🍜 ตะลอนกิน
-- ตลาดสดท่ายาง
-- ร้านทองม้วนแม่เล็ก
-- ร้านผัดไทย 100 ปี
-- ร้านข้าวแช่แม่เล็ก สกิดใจ
-"""
+    carousel = FlexMessage(
+        alt_text="กิจกรรมแนะนำในอำเภอท่ายาง",
+        contents=Carousel(contents=bubbles)
+    )
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[TextMessage(text=text)]
+            messages=[carousel]
         )
     )
 
 # =========================
-# 📖 INFO
+# 📖 เกี่ยวกับท่ายาง
 # =========================
 def send_info(api, event):
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
-                TextMessage(text="📖 เกี่ยวกับท่ายาง"),
+                TextMessage(text="📖 เกี่ยวกับอำเภอท่ายาง\nเลือกหัวข้อที่สนใจ"),
                 TextMessage(
                     text="เลือกหัวข้อ",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="ประวัติ", text="info_history")),
-                            QuickReplyItem(action=MessageAction(label="จุดเด่น", text="info_highlight")),
-                            QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle"))
+                            QuickReplyItem(
+                                action=MessageAction(
+                                    label="📜 ประวัติความเป็นมา",
+                                    text="info_history"
+                                )
+                            ),
+                            QuickReplyItem(
+                                action=MessageAction(
+                                    label="⭐ จุดเด่นของพื้นที่",
+                                    text="info_highlight"
+                                )
+                            ),
+                            QuickReplyItem(
+                                action=MessageAction(
+                                    label="🏡 วิถีชีวิตชุมชน",
+                                    text="info_lifestyle"
+                                )
+                            )
                         ]
                     )
                 )
@@ -190,28 +368,8 @@ def send_info(api, event):
         )
     )
 
-def send_places(api, event):
-    names = list(places.keys())
-
-    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
-
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text=f"""📍 สถานที่ท่องเที่ยว
-
-{text_list}
-
-👉 พิมพ์ชื่อสถานที่เพื่อดูรายละเอียด"""
-                )
-            ]
-        )
-    )
-
 # =========================
-# 📩 HANDLE
+# 📩 HANDLE MESSAGE
 # =========================
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
@@ -220,22 +378,27 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
+        # --- สถานที่ท่องเที่ยว ---
         if text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
 
+        # --- รายละเอียดสถานที่ ---
         elif text in places:
             send_place_detail(api, event, text)
 
-        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
+        # --- แผนที่ ---
+        elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
 
         elif text.startswith("map_"):
             name = text.replace("map_", "")
 
             if name == "all":
-                url = "https://maps.google.com"
-            else:
+                url = "https://maps.google.com/?q=อำเภอท่ายาง+เพชรบุรี"
+            elif name in places:
                 url = places[name]["map"]
+            else:
+                url = "https://maps.google.com/?q=อำเภอท่ายาง"
 
             api.reply_message(
                 ReplyMessageRequest(
@@ -244,25 +407,37 @@ def handle_message(event):
                 )
             )
 
+        # --- กิจกรรม ---
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
 
+        # --- เกี่ยวกับท่ายาง ---
         elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
 
         elif text.startswith("info_"):
             key = text.replace("info_", "")
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=info[key])]
+            if key in info:
+                titles = {
+                    "history": "📜 ประวัติความเป็นมา",
+                    "highlight": "⭐ จุดเด่นของพื้นที่",
+                    "lifestyle": "🏡 วิถีชีวิตชุมชน"
+                }
+                title = titles.get(key, "")
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[
+                            TextMessage(text=f"{title}\n\n{info[key]}")
+                        ]
+                    )
                 )
-            )
+            else:
+                send_info(api, event)
 
+        # --- Fuzzy Search ---
         else:
-            # 🔥 fuzzy search
             match = fuzzy_search_place(text)
-
             if match:
                 send_place_detail(api, event, match)
             else:
