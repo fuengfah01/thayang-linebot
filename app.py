@@ -2,7 +2,6 @@ from flask import Flask, request, send_from_directory
 import os
 from rapidfuzz import process
 
-# นำเข้าคลาสหลักที่จำเป็นสำหรับ Messaging API
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
@@ -13,8 +12,10 @@ from linebot.v3.messaging import (
     QuickReply,
     QuickReplyItem,
     MessageAction,
-    URIAction,
-    # นำเข้าคลาสสำหรับสร้าง Flex Message ไว้ที่นี่ที่เดียวเพื่อความเสถียร
+    URIAction
+)
+# แยกส่วน Models ออกมาให้ชัดเจนตามโครงสร้าง SDK v3.x
+from linebot.v3.messaging.models import (
     Bubble, 
     ImageComponent, 
     BoxComponent, 
