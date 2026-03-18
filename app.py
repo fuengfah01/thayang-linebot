@@ -6,6 +6,7 @@ from rapidfuzz import process
 
 from places import places
 from info import info
+from questions import questions
 
 import os
 
@@ -244,54 +245,74 @@ def send_places(api, event):
 # =========================
 # 📩 HANDLE
 # =========================
+import random  # 🔹 เพิ่มด้านบนไฟล์
+
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     text = event.message.text.strip()
     match = None  # 🔹 กำหนดค่าเริ่มต้น
+    is_question = False  # ตรวจสอบว่าเป็นคำถาม
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        # 🔹 ตอบสวัสดี
-        if text.lower() in ["สวัสดี", "hello"]:
+        # 🔹 ตอบสวัสดีแบบสุ่ม
+        if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ", "หวัดดีค่ะ", "หวัดดีงับ", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
+            greetings = [
+                "สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ",
+                "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ",
+                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ"
+            ]
+            reply_text = random.choice(greetings)
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(
-                        text="สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ"
-                    )]
+                    messages=[TextMessage(text=reply_text)]
                 )
             )
+            return
 
+        # 🔹 ตรวจสอบ yes_ ก่อน fuzzy
+        if text.startswith("yes_"):
+            name = text.replace("yes_", "")
+            if name in places:
+                send_place_detail(api, event, name)
+            elif name in questions:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=questions[name])]
+                    )
+                )
+            else:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูล")]
+                    )
+                )
+            return
+
+        # 🔹 ตรวจสอบคำสั่งอื่นๆ
         elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
-
         elif text in places:
             send_place_detail(api, event, text)
-
         elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
-
         elif text.startswith("map_"):
             name = text.replace("map_", "")
-            if name == "all":
-                url = "https://maps.google.com"
-            else:
-                url = places[name]["map"]
-
+            url = "https://maps.google.com" if name == "all" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
-
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-
         elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
-
         elif text.startswith("info_"):
             key = text.replace("info_", "")
             api.reply_message(
@@ -300,18 +321,25 @@ def handle_message(event):
                     messages=[TextMessage(text=info[key])]
                 )
             )
-
         else:
-            # 🔥 fuzzy search
-            match = fuzzy_search_place(text)
+            # 🔹 fuzzy search ทั้ง places และ questions
+            match_place = fuzzy_search_place(text)
+            match_question = None
+            # ตรวจสอบคำถามใกล้เคียง
+            if not match_place:
+                match_question = process.extractOne(text, list(questions.keys()))
+                if match_question and match_question[1] > 60:
+                    match = match_question[0]
+                    is_question = True
+            else:
+                match = match_place
 
-        # 🔹 ตรวจสอบ match ก่อนใช้งาน
-        if match is not None:
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[
-                        TextMessage(
+            if match:
+                # 🔹 quick reply ใช้เหมือนกัน
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(
                             text=f"คุณหมายถึง {match} ใช่ไหม",
                             quick_reply=QuickReply(
                                 items=[
@@ -319,13 +347,16 @@ def handle_message(event):
                                     QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="menu"))
                                 ]
                             )
-                        )
-                    ]
+                        )]
+                    )
                 )
-            )
-        elif text.startswith("yes_"):
-            name = text.replace("yes_", "")
-            send_place_detail(api, event, name)
+            else:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ไม่เข้าใจคำถาม กรุณาพิมพ์ใหม่")]
+                    )
+                )
 
 # =========================
 # 🚀 RUN
