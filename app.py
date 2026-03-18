@@ -303,8 +303,8 @@ def handle_message(event):
             send_place_detail(api, event, text)
         elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
-        elif text.startswith("map_"):
-            name = text.replace("map_", "")
+        elif text.startswith("แผนที่_"):
+            name = text.replace("แผนที่_", "")
             url = "https://maps.google.com" if name == "all" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
@@ -316,8 +316,8 @@ def handle_message(event):
             send_activity(api, event)
         elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
-        elif text.startswith("info_"):
-            key = text.replace("info_", "")
+        elif text.startswith("ข้อมูล_"):
+            key = text.replace("ข้อมูล_", "")
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
