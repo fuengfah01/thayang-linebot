@@ -2,11 +2,12 @@ from flask import Flask, request, send_from_directory
 from linebot.v3.messaging import *
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from rapidfuzz import process
 
 from places import places
 from info import info
 
-from rapidfuzz import process
+# import difflib
 import os
 
 app = Flask(__name__)
@@ -21,7 +22,7 @@ configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
 # =========================
-# 🖼 ROUTE รูป
+# 🖼 ROUTE รูปภาพ
 # =========================
 @app.route('/image/<path:filename>')
 def serve_image(filename):
@@ -50,7 +51,7 @@ def webhook():
     return "OK"
 
 # =========================
-# 🧠 FUZZY SEARCH (เทพ)
+# 🧠 AI หาใกล้เคียง
 # =========================
 def fuzzy_search_place(text):
     text = text.lower()
@@ -59,13 +60,16 @@ def fuzzy_search_place(text):
     mapping = {}
 
     for name, data in places.items():
+        # ชื่อหลัก
         all_choices.append(name)
         mapping[name] = name
 
+        # keywords
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
 
+        # synonyms
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
@@ -74,58 +78,40 @@ def fuzzy_search_place(text):
 
     if result:
         word, score, _ = result
-        if score > 60:
+
+        if score > 60:  # ปรับได้ (50 = หลวม, 80 = เข้ม)
             return mapping[word]
 
     return None
+    
 
 # =========================
-# 📍 LIST สถานที่
-# =========================
-def send_places(api, event):
-    names = list(places.keys())
-
-    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
-
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text=f"""📍 สถานที่ท่องเที่ยว
-
-{text_list}
-
-👉 พิมพ์ชื่อสถานที่เพื่อดูรายละเอียด"""
-                )
-            ]
-        )
-    )
-
-# =========================
-# 📍 DETAIL
+# 📍 สถานที่
 # =========================
 def send_place_detail(api, event, name):
     p = places[name]
 
+    # 🔥 สร้าง bubble 4 อัน (แต่ละรูป = 1 card)
     bubbles = []
+
     for img in p["images"]:
-        bubbles.append(
-            Bubble(
-                hero=ImageComponent(
-                    url=img,
-                    size="full",
-                    aspect_ratio="20:13",
-                    aspect_mode="cover"
-                )
+        bubble = Bubble(
+            hero=ImageComponent(
+                url=img,
+                size="full",
+                aspect_ratio="20:13",
+                aspect_mode="cover"
             )
         )
+        bubbles.append(bubble)
 
+    # 🔥 carousel (เลื่อนรูปได้)
     flex = FlexMessage(
-        alt_text=name,
+        alt_text=f"{name}",
         contents=Carousel(contents=bubbles)
     )
 
+    # 🔥 ข้อมูลข้อความ
     text = TextMessage(
         text=f"""📍 {name}
 
@@ -151,20 +137,22 @@ def send_place_detail(api, event, name):
 # 🗺 MAP
 # =========================
 def send_map(api, event):
-    names = list(places.keys())
-
-    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
+    names = list(places.keys())[:9]
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
-                    text=f"""🗺 แผนที่
-
-{text_list}
-
-👉 พิมพ์ชื่อสถานที่เพื่อเปิดแผนที่"""
+                    text="🗺 เลือกสถานที่",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
+                            for n in names
+                        ] + [
+                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
+                        ]
+                    )
                 )
             ]
         )
@@ -212,7 +200,37 @@ def send_info(api, event):
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
-                TextMessage(text="📖 เกี่ยวกับท่ายาง\nพิมพ์: ประวัติ / จุดเด่น / วิถีชีวิต")
+                TextMessage(text="📖 เกี่ยวกับท่ายาง"),
+                TextMessage(
+                    text="เลือกหัวข้อ",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label="ประวัติ", text="info_history")),
+                            QuickReplyItem(action=MessageAction(label="จุดเด่น", text="info_highlight")),
+                            QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle"))
+                        ]
+                    )
+                )
+            ]
+        )
+    )
+
+def send_places(api, event):
+    names = list(places.keys())
+
+    text_list = "\n".join([f"{i+1}. {n}" for i, n in enumerate(names)])
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text=f"""📍 สถานที่ท่องเที่ยว
+
+{text_list}
+
+👉 พิมพ์ชื่อสถานที่เพื่อดูรายละเอียด"""
+                )
             ]
         )
     )
@@ -227,50 +245,47 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        # เมนูหลัก
-        if text.lower() in ["menu", "เริ่ม", "start"]:
+        if text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
 
-        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
-            send_places(api, event)
+        elif text in places:
+            send_place_detail(api, event, text)
 
-        elif text in ["map", "แผนที่"]:
+        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
 
-        elif text in ["activity", "กิจกรรม"]:
+        elif text.startswith("map_"):
+            name = text.replace("map_", "")
+
+            if name == "all":
+                url = "https://maps.google.com"
+            else:
+                url = places[name]["map"]
+
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"🗺 {url}")]
+                )
+            )
+
+        elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
 
-        elif text in ["info", "เกี่ยวกับ"]:
+        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
 
-        elif text in ["ประวัติ", "history"]:
+        elif text.startswith("info_"):
+            key = text.replace("info_", "")
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=info["history"])]
+                    messages=[TextMessage(text=info[key])]
                 )
             )
 
-        elif text in ["จุดเด่น", "highlight"]:
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=info["highlight"])]
-                )
-            )
-
-        elif text in ["วิถีชีวิต", "lifestyle"]:
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=info["lifestyle"])]
-                )
-            )
-
-        # =========================
-        # 🔥 AI FUZZY SEARCH
-        # =========================
         else:
+            # 🔥 fuzzy search
             match = fuzzy_search_place(text)
 
             if match:
