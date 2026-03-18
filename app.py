@@ -8,6 +8,7 @@ from places import places
 from info import info
 
 import os
+import threading
 
 app = Flask(__name__)
 
@@ -34,6 +35,11 @@ def serve_image(filename):
 def home():
     return "LINE BOT RUNNING"
 
+# ✅ ป้องกัน Render สลีป — ให้ UptimeRobot หรือบริการอื่น ping ที่ /ping ทุก 5 นาที
+@app.route("/ping")
+def ping():
+    return "pong"
+
 # =========================
 # 🔗 WEBHOOK
 # =========================
@@ -42,10 +48,15 @@ def webhook():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
 
-    try:
-        handler.handle(body, signature)
-    except Exception as e:
-        print("Webhook error:", e)
+    # ✅ ตอบ LINE กลับทันทีก่อน แล้วค่อยประมวลผลใน background
+    def process_event():
+        try:
+            handler.handle(body, signature)
+        except Exception as e:
+            print("Webhook error:", e)
+
+    thread = threading.Thread(target=process_event)
+    thread.start()
 
     return "OK"
 
