@@ -96,9 +96,18 @@ def send_places(api, event):
 def send_place_detail(api, event, name):
     p = places[name]
 
-    # 🔥 สร้าง bubble 4 อัน (แต่ละรูป = 1 card)
-    bubbles = []
+    # ✅ ตอบทันที กัน timeout
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(text=f"📍 กำลังโหลดข้อมูล {name}...")
+            ]
+        )
+    )
 
+    # 🔥 สร้าง carousel รูป
+    bubbles = []
     for img in p["images"]:
         bubble = Bubble(
             hero=ImageComponent(
@@ -110,14 +119,13 @@ def send_place_detail(api, event, name):
         )
         bubbles.append(bubble)
 
-    # 🔥 carousel (เลื่อนรูปได้)
     flex = FlexMessage(
-        alt_text=f"{name}",
+        alt_text=name,
         contents=Carousel(contents=bubbles)
     )
 
-    # 🔥 ข้อมูลข้อความ
-    text = TextMessage(
+    # 🔥 ข้อความรายละเอียด
+    text_msg = TextMessage(
         text=f"""📍 {name}
 
 📜 ประวัติ:
@@ -131,10 +139,11 @@ def send_place_detail(api, event, name):
 """
     )
 
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[flex, text]
+    # ✅ ส่งทีหลัง (ไม่ timeout)
+    api.push_message(
+        PushMessageRequest(
+            to=event.source.user_id,
+            messages=[flex, text_msg]
         )
     )
 
