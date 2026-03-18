@@ -25,7 +25,15 @@ handler = WebhookHandler(CHANNEL_SECRET)
 # =========================
 @app.route('/image/<path:filename>')
 def serve_image(filename):
-    return send_from_directory('image', filename)
+    return send_from_directory(os.path.join(os.getcwd(), 'image'), filename)
+
+@app.route("/check")
+def check():
+    import os
+    return {
+        "cwd": os.getcwd(),
+        "files": os.listdir("image") if os.path.exists("image") else "no image folder"
+    }
 
 # =========================
 # 🌐 HOME
