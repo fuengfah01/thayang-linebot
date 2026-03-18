@@ -96,19 +96,24 @@ def fuzzy_search_place(text):
 def send_places(api, event):
     names = list(places.keys())[:9]
 
+    # ✅ ใช้ "place_0", "place_1" เป็น text แทนชื่อเต็ม
+    # เพราะ label ใน Quick Reply ถูกตัดที่ 20 ตัวอักษร ทำให้ text ที่ส่งมาไม่ตรงกับชื่อใน places
+    items = []
+    for i, n in enumerate(names):
+        label = n[:20]  # label แสดงผลตัดที่ 20 ตัว
+        items.append(
+            QuickReplyItem(
+                action=MessageAction(label=label, text=f"place_{i}")
+            )
+        )
+
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
                     text="📍 เลือกสถานที่ท่องเที่ยวในอำเภอท่ายาง",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(
-                                action=MessageAction(label=n, text=n)
-                            ) for n in names
-                        ]
-                    )
+                    quick_reply=QuickReply(items=items)
                 )
             ]
         )
@@ -219,23 +224,26 @@ def send_place_detail(api, event, name):
 def send_map(api, event):
     names = list(places.keys())[:9]
 
+    items = []
+    for i, n in enumerate(names):
+        items.append(
+            QuickReplyItem(
+                action=MessageAction(label=n[:20], text=f"map_{i}")
+            )
+        )
+    items.append(
+        QuickReplyItem(
+            action=MessageAction(label="📍 แผนที่อำเภอ", text="map_all")
+        )
+    )
+
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
                     text="🗺 เลือกสถานที่เพื่อดูเส้นทาง",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(
-                                action=MessageAction(label=n, text=f"map_{n}")
-                            ) for n in names
-                        ] + [
-                            QuickReplyItem(
-                                action=MessageAction(label="แผนที่อำเภอ", text="map_all")
-                            )
-                        ]
-                    )
+                    quick_reply=QuickReply(items=items)
                 )
             ]
         )
@@ -385,6 +393,9 @@ def send_info(api, event):
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     text = event.message.text.strip()
+    print(f"[DEBUG] received: '{text}'")
+
+    place_names = list(places.keys())
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
@@ -393,28 +404,44 @@ def handle_message(event):
         if text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
 
-        # --- รายละเอียดสถานที่ ---
+        # --- กดจาก Quick Reply place_0 .. place_8 ---
+        elif text.startswith("place_"):
+            try:
+                idx = int(text.replace("place_", ""))
+                name = place_names[idx]
+                print(f"[DEBUG] place index {idx} = {name}")
+                send_place_detail(api, event, name)
+            except (ValueError, IndexError):
+                send_places(api, event)
+
+        # --- พิมพ์ชื่อสถานที่ตรงๆ ---
         elif text in places:
             send_place_detail(api, event, text)
 
         # --- แผนที่ ---
-        elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
+        elif text in ["map", "แผนที่", "แผนที่อำเภอ", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
 
         elif text.startswith("map_"):
-            name = text.replace("map_", "")
+            suffix = text.replace("map_", "")
 
-            if name == "all":
+            if suffix == "all":
                 url = "https://maps.google.com/?q=อำเภอท่ายาง+เพชรบุรี"
-            elif name in places:
-                url = places[name]["map"]
+                label = "อำเภอท่ายาง"
             else:
-                url = "https://maps.google.com/?q=อำเภอท่ายาง"
+                try:
+                    idx = int(suffix)
+                    name = place_names[idx]
+                    url = places[name]["map"]
+                    label = name
+                except (ValueError, IndexError):
+                    url = "https://maps.google.com/?q=อำเภอท่ายาง"
+                    label = "อำเภอท่ายาง"
 
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"🗺 {url}")]
+                    messages=[TextMessage(text=f"🗺 เส้นทางไป {label}\n{url}")]
                 )
             )
 
