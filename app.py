@@ -257,11 +257,14 @@ def handle_message(event):
         api = MessagingApi(api_client)
 
         # 🔹 ตอบสวัสดีแบบสุ่ม
-        if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ", "หวัดดีค่ะ", "หวัดดีงับ", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
+        if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ", "หวัดดีค่ะ", "หวัดดีงับ", "ดี", "ดีจ้า", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
             greetings = [
                 "สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ",
                 "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ",
-                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ"
+                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ",
+                "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ",
+                "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ"
+
             ]
             reply_text = random.choice(greetings)
             api.reply_message(
@@ -273,8 +276,8 @@ def handle_message(event):
             return
 
         # 🔹 ตรวจสอบ yes_ ก่อน fuzzy
-        if text.startswith("yes_"):
-            name = text.replace("yes_", "")
+        if text.startswith("ใช่_"):
+            name = text.replace("ใช่_", "")
             if name in places:
                 send_place_detail(api, event, name)
             elif name in questions:
@@ -343,8 +346,8 @@ def handle_message(event):
                             text=f"คุณหมายถึง {match} ใช่ไหม",
                             quick_reply=QuickReply(
                                 items=[
-                                    QuickReplyItem(action=MessageAction(label="ใช่", text=f"yes_{match}")),
-                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="menu"))
+                                    QuickReplyItem(action=MessageAction(label="ใช่", text=f"ใช่_{match}")),
+                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="ไม่ใช่"))
                                 ]
                             )
                         )]
