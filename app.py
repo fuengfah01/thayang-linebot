@@ -203,7 +203,7 @@ def handle_message(event):
         elif text in places:
             send_place_detail(api, event, text)
 
-        elif text in ["map", "แผนที่"]:
+        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
 
         elif text.startswith("map_"):
@@ -221,10 +221,10 @@ def handle_message(event):
                 )
             )
 
-        elif text in ["activity", "กิจกรรม"]:
+        elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
 
-        elif text in ["info", "เกี่ยวกับท่ายาง"]:
+        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
 
         elif text.startswith("info_"):
