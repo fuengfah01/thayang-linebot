@@ -1,4 +1,4 @@
-BASE_URL = "https://your-app-name.onrender.com"  # 🔥 เปลี่ยนตรงนี้
+BASE_URL = "https://thayang-linebot.onrender.com/"  # 🔥 เปลี่ยนตรงนี้
 
 places = {
 

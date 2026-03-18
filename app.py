@@ -3,7 +3,7 @@ from linebot.v3.messaging import *
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
-from places1 import places
+from places import places
 from info import info
 
 import difflib
@@ -60,41 +60,31 @@ def find_place(text):
 # =========================
 # 📍 สถานที่
 # =========================
-def send_places(api, event):
-    names = list(places.keys())[:9]
-
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="📍 สถานที่ท่องเที่ยว",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label=n, text=n))
-                            for n in names
-                        ]
-                    )
-                )
-            ]
-        )
-    )
-
-# =========================
-# 📍 รายละเอียด
-# =========================
 def send_place_detail(api, event, name):
     p = places[name]
 
-    messages = []
+    # 🔥 สร้าง bubble 4 อัน (แต่ละรูป = 1 card)
+    bubbles = []
 
     for img in p["images"]:
-        messages.append(ImageMessage(
-            original_content_url=img,
-            preview_image_url=img
-        ))
+        bubble = Bubble(
+            hero=ImageComponent(
+                url=img,
+                size="full",
+                aspect_ratio="20:13",
+                aspect_mode="cover"
+            )
+        )
+        bubbles.append(bubble)
 
-    messages.append(TextMessage(
+    # 🔥 carousel (เลื่อนรูปได้)
+    flex = FlexMessage(
+        alt_text=f"{name}",
+        contents=Carousel(contents=bubbles)
+    )
+
+    # 🔥 ข้อมูลข้อความ
+    text = TextMessage(
         text=f"""📍 {name}
 
 📜 ประวัติ:
@@ -106,12 +96,12 @@ def send_place_detail(api, event, name):
 ⏰ เวลา:
 {p['time']}
 """
-    ))
+    )
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=messages
+            messages=[flex, text]
         )
     )
 
