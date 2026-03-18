@@ -58,6 +58,31 @@ def find_place(text):
     return match[0] if match else None
 
 # =========================
+# 📍 สถานที่ (9 ที่)
+# =========================
+def send_places(api, event):
+    names = list(places.keys())[:9]
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text="📍 สถานที่ท่องเที่ยว",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(
+                                action=MessageAction(label=n, text=n)
+                            )
+                            for n in names
+                        ]
+                    )
+                )
+            ]
+        )
+    )
+
+# =========================
 # 📍 สถานที่
 # =========================
 def send_place_detail(api, event, name):
@@ -203,7 +228,7 @@ def handle_message(event):
         elif text in places:
             send_place_detail(api, event, text)
 
-        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
+        elif text in ["map", "แผนที่", "แผนที่อำเภอท่ายาง"]:
             send_map(api, event)
 
         elif text.startswith("map_"):
