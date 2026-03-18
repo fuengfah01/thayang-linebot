@@ -301,10 +301,10 @@ def handle_message(event):
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["แผนที่", "แผนที่ภายในอำท่ายาง"]:
+        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
-        elif text.startswith("แผนที่_"):
-            name = text.replace("แผนที่_", "")
+        elif text.startswith("map_"):
+            name = text.replace("map_", "")
             url = "https://maps.google.com" if name == "all" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
@@ -314,10 +314,10 @@ def handle_message(event):
             )
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-        elif text in ["ข้อมูล", "เกี่ยวกับอำเภอท่ายาง"]:
+        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
-        elif text.startswith("ข้อมูล_"):
-            key = text.replace("ข้อมูล_", "")
+        elif text.startswith("info_"):
+            key = text.replace("info_", "")
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
