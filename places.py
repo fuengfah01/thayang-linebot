@@ -1,4 +1,4 @@
-BASE_URL = "https://thayang-linebot.onrender.com/"  # 🔥 เปลี่ยนตรงนี้
+BASE_URL = "https://thayang-linebot.onrender.com"
 
 places = {
 
@@ -93,19 +93,6 @@ places = {
         "map": "https://maps.google.com/?q=ศาลเจ้าพ่อกวนอู ท่ายาง"
     },
 
-    "ศาลเจ้าแม่ทับทิม": {
-        "images": [
-            f"{BASE_URL}/image/tubtim1.jpg",
-            f"{BASE_URL}/image/tubtim2.jpg",
-            f"{BASE_URL}/image/tubtim3.jpg",
-            f"{BASE_URL}/image/tubtim4.jpg"
-        ],
-        "history": "ศาลเจ้าสำคัญของชุมชน",
-        "highlight": "สถาปัตยกรรมจีน",
-        "time": "08:00 - 17:00",
-        "map": "https://maps.google.com/?q=ศาลเจ้าแม่ทับทิม ท่ายาง"
-    },
-
     "ข้าวแช่แม่เล็ก สกิดใจ": {
         "images": [
             f"{BASE_URL}/image/kaoch1.jpg",
@@ -117,5 +104,19 @@ places = {
         "highlight": "อาหารหน้าร้อน",
         "time": "09:00 - 16:00",
         "map": "https://maps.google.com/?q=ข้าวแช่แม่เล็ก"
+    },
+
+    "ศาลเจ้าแม่ทับทิม": {
+        "images": [
+            f"{BASE_URL}/image/tubtim1.jpg",
+            f"{BASE_URL}/image/tubtim2.jpg",
+            f"{BASE_URL}/image/tubtim3.jpg",
+            f"{BASE_URL}/image/tubtim4.jpg"
+        ],
+        "history": "ศาลเจ้าสำคัญของชุมชน",
+        "highlight": "สถาปัตยกรรมจีน",
+        "time": "08:00 - 17:00",
+        "map": "https://maps.google.com/?q=ศาลเจ้าแม่ทับทิม ท่ายาง"
     }
+
 }
