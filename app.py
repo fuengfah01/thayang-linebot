@@ -252,7 +252,18 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        if text in ["travel", "สถานที่ท่องเที่ยว"]:
+        # 🔹 ตอบสวัสดี
+        if text.lower() in ["สวัสดี", "hello"]:
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(
+                        text="สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ"
+                    )]
+                )
+            )
+
+        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
 
         elif text in places:
