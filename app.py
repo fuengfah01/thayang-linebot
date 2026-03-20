@@ -194,13 +194,36 @@ def send_map(api, event):
 # 🏨 ACTIVITY
 # =========================
 def send_activity(api, event):
-    text = "กิจกรรมในท่ายาง เช่น ไหว้พระ ถ่ายรูป และตะลอนกินค่ะ"
+    text = """🏨 กิจกรรมแนะนำ
+
+🙏 ไหว้พระ
+- วัดท่าคอย
+- ศาลเจ้าพ่อกวนอู
+- ศาลเจ้าแม่ทับทิม
+
+📸 ถ่ายรูป
+- วัดท่าคอย
+- ศาลเจ้าพ่อกวนอู
+- ศาลเจ้าแม่ทับทิม
+- อุโบสถ 100 ปี
+
+🐟 ให้อาหารปลา
+- อุทยานปลาวัดท่าคอย
+
+🍜 ตะลอนกิน
+- ตลาดสดท่ายาง
+- ร้านทองม้วนแม่เล็ก
+- ร้านผัดไทย 100 ปี
+- ร้านข้าวแช่แม่เล็ก สกิดใจ
+"""
+
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[TextMessage(text=text)]
         )
     )
+
 
 # =========================
 # 📖 INFO
@@ -209,22 +232,39 @@ def send_info(api, event):
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[TextMessage(text="เลือกหัวข้อ info")]
+            messages=[
+                TextMessage(text="📖 เกี่ยวกับท่ายาง"),
+                TextMessage(
+                    text="เลือกหัวข้อ",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label="ประวัติ", text="info_history")),
+                            QuickReplyItem(action=MessageAction(label="จุดเด่น", text="info_highlight")),
+                            QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle"))
+                        ]
+                    )
+                )
+            ]
         )
     )
 
 def send_places(api, event):
-    names = list(places.keys())[:9]
+    names = list(places.keys())[:9]  # เอา 9 ที่
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
                 TextMessage(
-                    text="📍 เลือกสถานที่",
+                    text="📍 เลือกสถานที่ท่องเที่ยว",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=name, text=name))
+                            QuickReplyItem(
+                                action=MessageAction(
+                                    label=name,
+                                    text=name
+                                )
+                            )
                             for name in names
                         ]
                     )
@@ -232,6 +272,7 @@ def send_places(api, event):
             ]
         )
     )
+
 
 # =========================
 # 📩 HANDLE MESSAGE
@@ -316,7 +357,7 @@ def handle_message(event):
                             quick_reply=QuickReply(
                                 items=[
                                     QuickReplyItem(action=MessageAction(label="ใช่", text=f"ใช่_{match}")),
-                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="menu"))
+                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="กลับหน้าหลัก"))
                                 ]
                             )
                         )
