@@ -7,9 +7,8 @@ from rapidfuzz import process
 from places import places
 from info import info
 from questions import questions
-from place_map import place_map
 
-import random
+import random  # 🔹 เพิ่มด้านบนไฟล์
 import os
 
 app = Flask(__name__)
@@ -62,13 +61,16 @@ def fuzzy_search_place(text):
     mapping = {}
 
     for name, data in places.items():
+        # ชื่อหลัก
         all_choices.append(name)
         mapping[name] = name
 
+        # keywords
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
 
+        # synonyms
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
@@ -81,14 +83,17 @@ def fuzzy_search_place(text):
             return mapping[word]
 
     return None
+    
 
 # =========================
 # 📍 สถานที่
 # =========================
 def send_place_detail(api, event, name):
     p = places[name]
+
     messages = []
 
+    # 🔹 สร้าง carousel เฉพาะถ้ามีรูป
     if p["images"]:
         bubbles = []
         for img in p["images"]:
@@ -108,6 +113,7 @@ def send_place_detail(api, event, name):
         )
         messages.append(flex)
 
+    # 🔹 ข้อมูลข้อความ
     text = TextMessage(
         text=f"""📍 {name}
 
@@ -123,29 +129,18 @@ def send_place_detail(api, event, name):
     )
     messages.append(text)
 
+    # 🔹 ส่งข้อความทั้งหมด
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=messages
         )
     )
-
 # =========================
 # 🗺 MAP
 # =========================
 def send_map(api, event):
-    place_labels = {
-        "แผนที่_วัดท่าคอย":             "วัดท่าคอย",
-        "แผนที่_อุโบสถ 100 ปี":         "อุโบสถ 100 ปี",
-        "แผนที่_อุทยานปลา":             "อุทยานปลา",
-        "แผนที่_ตลาดสดท่ายาง":          "ตลาดสดท่ายาง",
-        "แผนที่_ทองม้วนแม่เล็ก":        "ทองม้วนแม่เล็ก",
-        "แผนที่_ผัดไทย 100 ปี":         "ผัดไทย 100 ปี",
-        "แผนที่_ศาลเจ้าพ่อกวนอู":       "ศาลเจ้าพ่อกวนอู",
-        "แผนที่_ข้าวแช่แม่เล็ก สกิดใจ": "ข้าวแช่สกิดใจ",
-        "แผนที่_ศาลเจ้าแม่ทับทิม":      "ศาลเจ้าแม่ทับทิม",
-        "แผนที่_อำเภอท่ายาง":           "แผนที่อำเภอ",
-    }
+    names = list(places.keys())[:9]
 
     api.reply_message(
         ReplyMessageRequest(
@@ -155,8 +150,10 @@ def send_map(api, event):
                     text="🗺 เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=label, text=key))
-                            for key, label in place_labels.items()
+                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
+                            for n in names
+                        ] + [
+                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
                         ]
                     )
                 )
@@ -177,10 +174,10 @@ def send_activity(api, event):
                     text="เลือกกิจกรรมที่สนใจ",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ",     text="กิจกรรม_ไหว้พระ")),
-                            QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป",      text="กิจกรรม_ถ่ายรูป")),
-                            QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="กิจกรรม_ให้อาหารปลา")),
-                            QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน",    text="กิจกรรม_ตะลอนกิน")),
+                            QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ", text="activity_pray")),
+                            QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป", text="activity_photo")),
+                            QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="activity_fish")),
+                            QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน", text="activity_eat")),
                         ]
                     )
                 )
@@ -188,25 +185,26 @@ def send_activity(api, event):
         )
     )
 
+
 activity_details = {
-    "กิจกรรม_ไหว้พระ": """🙏 ไหว้พระในท่ายาง
+    "activity_pray": """🙏 ไหว้พระในท่ายาง
 
 - วัดท่าคอย
 - ศาลเจ้าพ่อกวนอู
 - ศาลเจ้าแม่ทับทิม""",
 
-    "กิจกรรม_ถ่ายรูป": """📸 จุดถ่ายรูปในท่ายาง
+    "activity_photo": """📸 จุดถ่ายรูปในท่ายาง
 
 - วัดท่าคอย
 - ศาลเจ้าพ่อกวนอู
 - ศาลเจ้าแม่ทับทิม
 - อุโบสถ 100 ปี""",
 
-    "กิจกรรม_ให้อาหารปลา": """🐟 ให้อาหารปลาในท่ายาง
+    "activity_fish": """🐟 ให้อาหารปลาในท่ายาง
 
 - อุทยานปลาวัดท่าคอย""",
 
-    "กิจกรรม_ตะลอนกิน": """🍜 ตะลอนกินในท่ายาง
+    "activity_eat": """🍜 ตะลอนกินในท่ายาง
 
 - ตลาดสดท่ายาง
 - ร้านทองม้วนแม่เล็ก
@@ -227,16 +225,17 @@ def send_info(api, event):
                     text="เลือกหัวข้อ",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="📜 ประวัติ",   text="ข้อมูล_ประวัติ")),
-                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น",   text="ข้อมูล_จุดเด่น")),
-                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="ข้อมูล_วิถีชีวิต")),
-                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="ข้อมูล_วัฒนธรรม"))
+                            QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="info_history")),
+                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="info_highlight")),
+                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="info_lifestyle")),
+                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="info_culture"))
                         ]
                     )
                 )
             ]
         )
     )
+
 
 def send_culture(api, event):
     api.reply_message(
@@ -248,16 +247,16 @@ def send_culture(api, event):
                     text="เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย",          text="ข้อมูล_วัฒนธรรม_วัดท่าคอย")),
-                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี",      text="ข้อมูล_วัฒนธรรม_อุโบสถ")),
-                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="ข้อมูล_วัฒนธรรม_อุทยานปลา")),
-                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง",       text="ข้อมูล_วัฒนธรรม_ตลาดสด")),
-                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก",  text="ข้อมูล_วัฒนธรรม_ทองม้วน")),
-                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี",   text="ข้อมูล_วัฒนธรรม_ผัดไทย")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู",    text="ข้อมูล_วัฒนธรรม_กวนอู")),
-                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก",     text="ข้อมูล_วัฒนธรรม_ข้าวแช่")),
-                            QuickReplyItem(action=MessageAction(label="สกิดใจ",             text="ข้อมูล_วัฒนธรรม_สกิดใจ")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม",   text="ข้อมูล_วัฒนธรรม_ทับทิม"))
+                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย", text="info_culture_wat_takhoi")),
+                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี", text="info_culture_ubosot")),
+                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="info_culture_fish_park")),
+                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง", text="info_culture_market")),
+                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก", text="info_culture_thong_muan")),
+                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="info_culture_padthai")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="info_culture_guanyu")),
+                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="info_culture_khao_chae")),
+                            QuickReplyItem(action=MessageAction(label="สกิดใจ", text="info_culture_sakit_jai")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="info_culture_tapthim"))
                         ]
                     )
                 )
@@ -266,7 +265,7 @@ def send_culture(api, event):
     )
 
 def send_places(api, event):
-    names = list(places.keys())[:9]
+    names = list(places.keys())[:9]  # เอา 9 ที่
 
     api.reply_message(
         ReplyMessageRequest(
@@ -276,7 +275,12 @@ def send_places(api, event):
                     text="📍 เลือกสถานที่ท่องเที่ยว",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=name, text=name))
+                            QuickReplyItem(
+                                action=MessageAction(
+                                    label=name,
+                                    text=name
+                                )
+                            )
                             for name in names
                         ]
                     )
@@ -288,15 +292,17 @@ def send_places(api, event):
 # =========================
 # 📩 HANDLE
 # =========================
+
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     text = event.message.text.strip()
-    match = None
-    is_question = False
+    match = None  # 🔹 กำหนดค่าเริ่มต้น
+    is_question = False  # ตรวจสอบว่าเป็นคำถาม
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
+        # 🔹 ตอบสวัสดีแบบสุ่ม
         if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ", "หวัดดีค่ะ", "หวัดดีงับ", "ดี", "ดีจ้า", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
             greetings = [
                 "สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ",
@@ -304,15 +310,18 @@ def handle_message(event):
                 "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ",
                 "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ",
                 "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ"
+
             ]
+            reply_text = random.choice(greetings)
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=random.choice(greetings))]
+                    messages=[TextMessage(text=reply_text)]
                 )
             )
             return
 
+        # 🔹 ตรวจสอบ ใช่_ ก่อน fuzzy
         if text.startswith("ใช่_"):
             name = text.replace("ใช่_", "")
             if name in places:
@@ -333,28 +342,30 @@ def handle_message(event):
                 )
             return
 
-        elif text in ["สถานที่", "สถานที่ท่องเที่ยว"]:
+        # 🔹 ตรวจสอบคำสั่งอื่นๆ
+        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
+        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
-        elif text in place_map:
-            url = place_map[text]
+        elif text.startswith("map_"):
+            name = text.replace("map_", "")
+            url = "https://maps.google.com" if name == "all" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
-        elif text in ["กิจกรรม", "กิจกรรมภายในอำเภอท่ายาง"]:
+        elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-        elif text in ["ข้อมูล", "เกี่ยวกับอำเภอท่ายาง"]:
+        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
-        elif text == "ข้อมูล_วัฒนธรรม":
+        elif text == "info_culture":
             send_culture(api, event)
-        elif text.startswith("ข้อมูล_"):
-            key = text.replace("ข้อมูล_", "")
+        elif text.startswith("info_"):
+            key = text.replace("info_", "")
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -369,8 +380,10 @@ def handle_message(event):
                 )
             )
         else:
+            # 🔹 fuzzy search ทั้ง places และ questions
             match_place = fuzzy_search_place(text)
             match_question = None
+            # ตรวจสอบคำถามใกล้เคียง
             if not match_place:
                 match_question = process.extractOne(text, list(questions.keys()))
                 if match_question and match_question[1] > 60:
@@ -380,6 +393,7 @@ def handle_message(event):
                 match = match_place
 
             if match:
+                # 🔹 quick reply ใช้เหมือนกัน
                 api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -387,7 +401,7 @@ def handle_message(event):
                             text=f"คุณหมายถึง {match} ใช่ไหม",
                             quick_reply=QuickReply(
                                 items=[
-                                    QuickReplyItem(action=MessageAction(label="ใช่",   text=f"ใช่_{match}")),
+                                    QuickReplyItem(action=MessageAction(label="ใช่", text=f"ใช่_{match}")),
                                     QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="ไม่ใช่"))
                                 ]
                             )
