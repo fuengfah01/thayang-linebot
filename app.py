@@ -7,6 +7,7 @@ from rapidfuzz import process
 from places import places
 from info import info
 from questions import questions
+from place_map import place_map
 
 import random  # 🔹 เพิ่มด้านบนไฟล์
 import os
@@ -140,7 +141,18 @@ def send_place_detail(api, event, name):
 # 🗺 MAP
 # =========================
 def send_map(api, event):
-    names = list(places.keys())[:9]
+    place_labels = {
+        "แผนที่_วัดท่าคอย":           "วัดท่าคอย",
+        "แผนที่_อุโบสถ 100 ปี":       "อุโบสถ 100 ปี",
+        "แผนที่_อุทยานปลา":           "อุทยานปลา",
+        "แผนที่_ตลาดสดท่ายาง":        "ตลาดสดท่ายาง",
+        "แผนที่_ทองม้วนแม่เล็ก":      "ทองม้วนแม่เล็ก",
+        "แผนที่_ผัดไทย 100 ปี":       "ผัดไทย 100 ปี",
+        "แผนที่_ศาลเจ้าพ่อกวนอู":     "ศาลเจ้าพ่อกวนอู",
+        "แผนที่_ข้าวแช่แม่เล็ก สกิดใจ": "ข้าวแช่สกิดใจ",
+        "แผนที่_ศาลเจ้าแม่ทับทิม":    "ศาลเจ้าแม่ทับทิม",
+        "แผนที่_อำเภอท่ายาง":         "แผนที่อำเภอ",
+    }
 
     api.reply_message(
         ReplyMessageRequest(
@@ -150,10 +162,11 @@ def send_map(api, event):
                     text="🗺 เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
-                            for n in names
-                        ] + [
-                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
+                            QuickReplyItem(action=MessageAction(
+                                label=label,
+                                text=key
+                            ))
+                            for key, label in place_labels.items()
                         ]
                     )
                 )
@@ -347,11 +360,10 @@ def handle_message(event):
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["map","แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
+        elif text in ["แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
-        elif text.startswith("map_"):
-            name = text.replace("map_", "")
-            url = "https://maps.google.com" if name == "all" else places[name]["map"]
+        elif text in place_map:
+            url = place_map[text]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
