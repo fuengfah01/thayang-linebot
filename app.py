@@ -343,11 +343,11 @@ def handle_message(event):
             return
 
         # 🔹 ตรวจสอบคำสั่งอื่นๆ
-        elif text in ["สถานที่", "สถานที่ท่องเที่ยว"]:
+        elif text in ["travel","สถานที่", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
+        elif text in ["map","แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
         elif text.startswith("map_"):
             name = text.replace("map_", "")
@@ -358,9 +358,9 @@ def handle_message(event):
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
-        elif text in ["กิจกรรม", "กิจกรรมภายในอำเภอท่ายาง"]:
+        elif text in ["activity", "กิจกรรม", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-        elif text in ["ข้อมูล", "เกี่ยวกับอำเภอท่ายาง"]:
+        elif text in ["info", "ข้อมูล", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
         elif text == "ข้อมูล_วัฒนธรรม":
             send_culture(api, event)
