@@ -5,9 +5,9 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from rapidfuzz import process
 
 from places import places
+from place_map import place_map
 from info import info
 from questions import questions
-from place_map import place_map
 
 import random  # 🔹 เพิ่มด้านบนไฟล์
 import os
