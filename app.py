@@ -347,7 +347,7 @@ def handle_message(event):
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
+        elif text in ["map","แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
         elif text.startswith("map_"):
             name = text.replace("map_", "")
