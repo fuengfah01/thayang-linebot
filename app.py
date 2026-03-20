@@ -164,35 +164,52 @@ def send_map(api, event):
 # 🏨 ACTIVITY
 # =========================
 def send_activity(api, event):
-    text = """🏨 กิจกรรมแนะนำ
-
-🙏 ไหว้พระ
-- วัดท่าคอย
-- ศาลเจ้าพ่อกวนอู
-- ศาลเจ้าแม่ทับทิม
-
-📸 ถ่ายรูป
-- วัดท่าคอย
-- ศาลเจ้าพ่อกวนอู
-- ศาลเจ้าแม่ทับทิม
-- อุโบสถ 100 ปี
-
-🐟 ให้อาหารปลา
-- อุทยานปลาวัดท่าคอย
-
-🍜 ตะลอนกิน
-- ตลาดสดท่ายาง
-- ร้านทองม้วนแม่เล็ก
-- ร้านผัดไทย 100 ปี
-- ร้านข้าวแช่แม่เล็ก สกิดใจ
-"""
-
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[TextMessage(text=text)]
+            messages=[
+                TextMessage(text="🏨 กิจกรรมแนะนำในท่ายาง"),
+                TextMessage(
+                    text="เลือกกิจกรรมที่สนใจ",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ", text="activity_pray")),
+                            QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป", text="activity_photo")),
+                            QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="activity_fish")),
+                            QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน", text="activity_eat")),
+                        ]
+                    )
+                )
+            ]
         )
     )
+
+
+activity_details = {
+    "activity_pray": """🙏 ไหว้พระในท่ายาง
+
+- วัดท่าคอย
+- ศาลเจ้าพ่อกวนอู
+- ศาลเจ้าแม่ทับทิม""",
+
+    "activity_photo": """📸 จุดถ่ายรูปในท่ายาง
+
+- วัดท่าคอย
+- ศาลเจ้าพ่อกวนอู
+- ศาลเจ้าแม่ทับทิม
+- อุโบสถ 100 ปี""",
+
+    "activity_fish": """🐟 ให้อาหารปลาในท่ายาง
+
+- อุทยานปลาวัดท่าคอย""",
+
+    "activity_eat": """🍜 ตะลอนกินในท่ายาง
+
+- ตลาดสดท่ายาง
+- ร้านทองม้วนแม่เล็ก
+- ร้านผัดไทย 100 ปี
+- ร้านข้าวแช่แม่เล็ก สกิดใจ""",
+}
 
 # =========================
 # 📖 INFO
@@ -209,8 +226,8 @@ def send_info(api, event):
                         items=[
                             QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="info_history")),
                             QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="info_highlight")),
-                            QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle")),
-                            QuickReplyItem(action=MessageAction(label="วัฒนธรรม", text="info_culture"))
+                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="info_lifestyle")),
+                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="info_culture"))
                         ]
                     )
                 )
@@ -353,6 +370,16 @@ def handle_message(event):
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=info[key])]
+                )
+            )
+        elif text in ["activity", "กิจกรรม", "กิจกรรมแนะนำ"]:
+            send_activity(api, event)
+
+        elif text in activity_details:
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=activity_details[text])]
                 )
             )
         else:
