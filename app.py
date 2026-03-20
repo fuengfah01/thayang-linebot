@@ -7,10 +7,8 @@ from rapidfuzz import process
 from places import places
 from info import info
 from questions import questions
-from intents import intents   # ⭐ เพิ่มตรงนี้
 
 import os
-import random
 
 app = Flask(__name__)
 
@@ -53,26 +51,7 @@ def webhook():
     return "OK"
 
 # =========================
-# 🧠 INTENT DETECTION
-# =========================
-def detect_intent(text):
-    text = text.lower()
-
-    best_intent = None
-    best_score = 0
-
-    for intent, data in intents.items():
-        result = process.extractOne(text, data["keywords"])
-        if result:
-            _, score, _ = result
-            if score > best_score and score > 60:
-                best_score = score
-                best_intent = intent
-
-    return best_intent
-
-# =========================
-# 🧠 FUZZY SEARCH (PLACE)
+# 🧠 AI หาใกล้เคียง
 # =========================
 def fuzzy_search_place(text):
     text = text.lower()
@@ -81,13 +60,16 @@ def fuzzy_search_place(text):
     mapping = {}
 
     for name, data in places.items():
+        # ชื่อหลัก
         all_choices.append(name)
         mapping[name] = name
 
+        # keywords
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
 
+        # synonyms
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
@@ -100,30 +82,17 @@ def fuzzy_search_place(text):
             return mapping[word]
 
     return None
+    
 
 # =========================
-# 🧠 FUZZY SEARCH (QUESTION)
-# =========================
-def fuzzy_search_question(text):
-    text = text.lower()
-
-    choices = list(questions.keys())
-    result = process.extractOne(text, choices)
-
-    if result:
-        word, score, _ = result
-        if score > 60:
-            return word
-
-    return None
-
-# =========================
-# 📍 PLACE DETAIL
+# 📍 สถานที่
 # =========================
 def send_place_detail(api, event, name):
     p = places[name]
+
     messages = []
 
+    # 🔹 สร้าง carousel เฉพาะถ้ามีรูป
     if p["images"]:
         bubbles = []
         for img in p["images"]:
@@ -138,12 +107,13 @@ def send_place_detail(api, event, name):
             bubbles.append(bubble)
 
         flex = FlexMessage(
-            alt_text=name,
+            alt_text=f"{name}",
             contents=CarouselContainer(contents=bubbles)
         )
         messages.append(flex)
 
-    text_msg = TextMessage(
+    # 🔹 ข้อมูลข้อความ
+    text = TextMessage(
         text=f"""📍 {name}
 
 📜 ประวัติ:
@@ -156,15 +126,15 @@ def send_place_detail(api, event, name):
 {p['time']}
 """
     )
-    messages.append(text_msg)
+    messages.append(text)
 
+    # 🔹 ส่งข้อความทั้งหมด
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=messages
         )
     )
-
 # =========================
 # 🗺 MAP
 # =========================
@@ -224,7 +194,6 @@ def send_activity(api, event):
         )
     )
 
-
 # =========================
 # 📖 INFO
 # =========================
@@ -273,21 +242,42 @@ def send_places(api, event):
         )
     )
 
+# =========================
+# 📩 HANDLE
+# =========================
+import random  # 🔹 เพิ่มด้านบนไฟล์
 
-# =========================
-# 📩 HANDLE MESSAGE
-# =========================
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     text = event.message.text.strip()
+    match = None  # 🔹 กำหนดค่าเริ่มต้น
+    is_question = False  # ตรวจสอบว่าเป็นคำถาม
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        # ✅ confirm
+        # 🔹 ตอบสวัสดีแบบสุ่ม
+        if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ", "หวัดดีค่ะ", "หวัดดีงับ", "ดี", "ดีจ้า", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
+            greetings = [
+                "สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ",
+                "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ",
+                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ",
+                "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ",
+                "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ"
+
+            ]
+            reply_text = random.choice(greetings)
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply_text)]
+                )
+            )
+            return
+
+        # 🔹 ตรวจสอบ ใช่_ ก่อน fuzzy
         if text.startswith("ใช่_"):
             name = text.replace("ใช่_", "")
-
             if name in places:
                 send_place_detail(api, event, name)
             elif name in questions:
@@ -297,80 +287,79 @@ def handle_message(event):
                         messages=[TextMessage(text=questions[name])]
                     )
                 )
+            else:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูล")]
+                    )
+                )
             return
 
-        # ✅ intent ก่อนเลย
-        intent = detect_intent(text)
-
-        if intent == "greeting":
-            reply = random.choice([
-                "สวัสดีค่ะ มีอะไรให้ช่วยไหมคะ",
-                "สวัสดีค่ะ ยินดีให้บริการค่ะ"
-            ])
+        # 🔹 ตรวจสอบคำสั่งอื่นๆ
+        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
+            send_places(api, event)
+        elif text in places:
+            send_place_detail(api, event, text)
+        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
+            send_map(api, event)
+        elif text.startswith("map_"):
+            name = text.replace("map_", "")
+            url = "https://maps.google.com" if name == "all" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply)]
+                    messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
-            return
-
-        elif intent == "map":
-            send_map(api, event)
-            return
-
-        elif intent == "travel":
-            send_places(api, event)
-            return
-
-        elif intent == "activity":
+        elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-            return
-
-        elif intent == "info":
+        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
-            return
-
-        # ✅ ตรงตัว
-        if text in places:
-            send_place_detail(api, event, text)
-            return
-
-        # ✅ fuzzy
-        match_place = fuzzy_search_place(text)
-        match_question = fuzzy_search_question(text)
-
-        if match_place:
-            match = match_place
-        elif match_question:
-            match = match_question
-        else:
-            match = None
-
-        if match:
+        elif text.startswith("info_"):
+            key = text.replace("info_", "")
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[
-                        TextMessage(
+                    messages=[TextMessage(text=info[key])]
+                )
+            )
+        else:
+            # 🔹 fuzzy search ทั้ง places และ questions
+            match_place = fuzzy_search_place(text)
+            match_question = None
+            # ตรวจสอบคำถามใกล้เคียง
+            if not match_place:
+                match_question = process.extractOne(text, list(questions.keys()))
+                if match_question and match_question[1] > 60:
+                    match = match_question[0]
+                    is_question = True
+            else:
+                match = match_place
+
+            if match:
+                # 🔹 quick reply ใช้เหมือนกัน
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(
                             text=f"คุณหมายถึง {match} ใช่ไหม",
                             quick_reply=QuickReply(
                                 items=[
                                     QuickReplyItem(action=MessageAction(label="ใช่", text=f"ใช่_{match}")),
-                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="กลับหน้าหลัก"))
+                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="ไม่ใช่"))
                                 ]
                             )
-                        )
-                    ]
+                        )]
+                    )
                 )
-            )
-        else:
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text="ไม่เข้าใจคำถาม ลองใหม่ค่ะ")]
+            else:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ไม่เข้าใจคำถาม กรุณาพิมพ์ใหม่")]
+                    )
                 )
-            )
 
 # =========================
 # 🚀 RUN
