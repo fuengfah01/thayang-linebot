@@ -91,13 +91,21 @@ def fuzzy_search_place(text):
 def send_place_detail(api, event, name):
     p = places[name]
 
-    # 🔹 1. reply ข้อความก่อน (เร็วมาก ไม่ timeout)
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text=f"""📍 {name}
+    messages = []
+
+    # 🔹 ส่งรูป (ต้องมาก่อน)
+    if p["images"]:
+        messages.append(
+            ImageMessage(
+                original_content_url=p["images"][0],
+                preview_image_url=p["images"][0]
+            )
+        )
+
+    # 🔹 แล้วค่อยส่งข้อความ
+    messages.append(
+        TextMessage(
+            text=f"""📍 {name}
 
 📜 ประวัติ:
 {p['history']}
@@ -108,24 +116,15 @@ def send_place_detail(api, event, name):
 ⏰ เวลา:
 {p['time']}
 """
-                )
-            ]
         )
     )
 
-    # 🔹 2. แล้วค่อย push รูป (แยกอีก request)
-    if p["images"]:
-        api.push_message(
-            PushMessageRequest(
-                to=event.source.user_id,
-                messages=[
-                    ImageMessage(
-                        original_content_url=p["images"][0],
-                        preview_image_url=p["images"][0]
-                    )
-                ]
-            )
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=messages[:1]  # 🔥 จำกัดไม่เกิน 2
         )
+    )
 # =========================
 # 🗺 MAP
 # =========================
@@ -159,7 +158,7 @@ def send_activity(api, event):
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
-                TextMessage(text="🏨 กิจกรรมแนะนำในท่ายาง"),
+                TextMessage(text="🧭 กิจกรรมแนะนำในท่ายาง"),
                 TextMessage(
                     text="เลือกกิจกรรมที่สนใจ",
                     quick_reply=QuickReply(
