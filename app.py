@@ -122,7 +122,7 @@ def send_place_detail(api, event, name):
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=messages[:1]  # 🔥 จำกัดไม่เกิน 2
+            messages=messages[:2]  # 🔥 จำกัดไม่เกิน 2
         )
     )
 # =========================
