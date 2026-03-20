@@ -91,70 +91,18 @@ def fuzzy_search_place(text):
 def send_place_detail(api, event, name):
     p = places[name]
 
-    bubbles = []
-
-    imgs = p["images"]
-
-    # 🔹 แบ่งรูปทีละ 3
-    for i in range(0, len(imgs), 3):
-        group = imgs[i:i+3]
-
-        contents = []
-
-        # 🔹 รูปใหญ่ (บน)
-        if len(group) >= 1:
-            contents.append(
-                ImageComponent(
-                    url=group[0],
-                    size="full",
-                    aspect_ratio="20:13",
-                    aspect_mode="cover"
-                )
-            )
-
-        # 🔹 รูปเล็ก 2 รูป (ล่าง)
-        if len(group) >= 2:
-            row = []
-            for img in group[1:3]:
-                row.append(
-                    ImageComponent(
-                        url=img,
-                        size="full",
-                        aspect_ratio="1:1",
-                        aspect_mode="cover"
-                    )
-                )
-
-            contents.append(
-                BoxComponent(
-                    layout="horizontal",
-                    contents=row,
-                    spacing="sm"
-                )
-            )
-
-        bubble = BubbleContainer(
-            body=BoxComponent(
-                layout="vertical",
-                contents=contents,
-                spacing="sm"
-            )
-        )
-
-        bubbles.append(bubble)
-
     messages = []
 
-    # 🔹 Flex (รูปหลายรูป)
-    if bubbles:
+    # 🔹 ส่งรูป (ต้องมาก่อน)
+    if p["images"]:
         messages.append(
-            FlexMessage(
-                alt_text=name,
-                contents=CarouselContainer(contents=bubbles)
+            ImageMessage(
+                original_content_url=p["images"][0],
+                preview_image_url=p["images"][0]
             )
         )
 
-    # 🔹 ข้อความ
+    # 🔹 แล้วค่อยส่งข้อความ
     messages.append(
         TextMessage(
             text=f"""📍 {name}
@@ -174,7 +122,7 @@ def send_place_detail(api, event, name):
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=messages[:2]  # กัน timeout
+            messages=messages[:2]  # 🔥 จำกัดไม่เกิน 2
         )
     )
 # =========================
