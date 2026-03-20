@@ -95,23 +95,13 @@ def send_place_detail(api, event, name):
 
     # 🔹 สร้าง carousel เฉพาะถ้ามีรูป
     if p["images"]:
-        bubbles = []
         for img in p["images"]:
-            bubble = BubbleContainer(
-                hero=ImageComponent(
-                    url=img,
-                    size="full",
-                    aspect_ratio="20:13",
-                    aspect_mode="cover"
+            messages.append(
+                ImageMessage(
+                    original_content_url=img,
+                    preview_image_url=img
                 )
             )
-            bubbles.append(bubble)
-
-        flex = FlexMessage(
-            alt_text=f"{name}",
-            contents=CarouselContainer(contents=bubbles)
-        )
-        messages.append(flex)
 
     # 🔹 ข้อมูลข้อความ
     text = TextMessage(
