@@ -207,8 +207,8 @@ def send_info(api, event):
                     text="เลือกหัวข้อ",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="ประวัติ", text="info_history")),
-                            QuickReplyItem(action=MessageAction(label="จุดเด่น", text="info_highlight")),
+                            QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="info_history")),
+                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="info_highlight")),
                             QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle")),
                             QuickReplyItem(action=MessageAction(label="วัฒนธรรม", text="info_culture"))
                         ]
@@ -229,16 +229,16 @@ def send_culture(api, event):
                     text="เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย", text="culture_wat_takhoi")),
-                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี", text="culture_ubosot")),
-                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="culture_fish_park")),
-                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง", text="culture_market")),
-                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก", text="culture_thong_muan")),
-                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="culture_padthai")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="culture_guanyu")),
-                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="culture_khao_chae")),
-                            QuickReplyItem(action=MessageAction(label="สกิดใจ", text="culture_sakit_jai")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="culture_tapthim"))
+                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย", text="info_culture_wat_takhoi")),
+                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี", text="info_culture_ubosot")),
+                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="info_culture_fish_park")),
+                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง", text="info_culture_market")),
+                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก", text="info_culture_thong_muan")),
+                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="info_culture_padthai")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="info_culture_guanyu")),
+                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="info_culture_khao_chae")),
+                            QuickReplyItem(action=MessageAction(label="สกิดใจ", text="info_culture_sakit_jai")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="info_culture_tapthim"))
                         ]
                     )
                 )
