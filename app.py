@@ -209,7 +209,36 @@ def send_info(api, event):
                         items=[
                             QuickReplyItem(action=MessageAction(label="ประวัติ", text="info_history")),
                             QuickReplyItem(action=MessageAction(label="จุดเด่น", text="info_highlight")),
-                            QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle"))
+                            QuickReplyItem(action=MessageAction(label="วิถีชีวิต", text="info_lifestyle")),
+                            QuickReplyItem(action=MessageAction(label="วัฒนธรรม", text="info_culture"))
+                        ]
+                    )
+                )
+            ]
+        )
+    )
+
+
+def send_culture(api, event):
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(text="🏛️ วัฒนธรรมท่ายาง"),
+                TextMessage(
+                    text="เลือกสถานที่",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย", text="culture_wat_takhoi")),
+                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี", text="culture_ubosot")),
+                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="culture_fish_park")),
+                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง", text="culture_market")),
+                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก", text="culture_thong_muan")),
+                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="culture_padthai")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="culture_guanyu")),
+                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="culture_khao_chae")),
+                            QuickReplyItem(action=MessageAction(label="สกิดใจ", text="culture_sakit_jai")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="culture_tapthim"))
                         ]
                     )
                 )
@@ -316,6 +345,8 @@ def handle_message(event):
             send_activity(api, event)
         elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
+        elif text == "info_culture":
+            send_culture(api, event)
         elif text.startswith("info_"):
             key = text.replace("info_", "")
             api.reply_message(
