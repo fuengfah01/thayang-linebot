@@ -8,6 +8,7 @@ from places import places
 from info import info
 from questions import questions
 
+import random  # 🔹 เพิ่มด้านบนไฟล์
 import os
 
 app = Flask(__name__)
@@ -291,7 +292,6 @@ def send_places(api, event):
 # =========================
 # 📩 HANDLE
 # =========================
-import random  # 🔹 เพิ่มด้านบนไฟล์
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
@@ -372,9 +372,6 @@ def handle_message(event):
                     messages=[TextMessage(text=info[key])]
                 )
             )
-        elif text in ["activity", "กิจกรรม", "กิจกรรมแนะนำ"]:
-            send_activity(api, event)
-
         elif text in activity_details:
             api.reply_message(
                 ReplyMessageRequest(
