@@ -91,17 +91,13 @@ def fuzzy_search_place(text):
 def send_place_detail(api, event, name):
     p = places[name]
 
-    messages = []
-
-    # 🔹 สร้าง carousel เฉพาะถ้ามีรูป
-    if p["images"]:
-        messages.append(TextMessage(text="📸 รูปสถานที่:"))
-        for img in p["images"]:
-            messages.append(TextMessage(text=img))
-
-    # 🔹 ข้อมูลข้อความ
-    text = TextMessage(
-        text=f"""📍 {name}
+    # 🔹 1. reply ข้อความก่อน (เร็วมาก ไม่ timeout)
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text=f"""📍 {name}
 
 📜 ประวัติ:
 {p['history']}
@@ -112,16 +108,24 @@ def send_place_detail(api, event, name):
 ⏰ เวลา:
 {p['time']}
 """
-    )
-    messages.append(text)
-
-    # 🔹 ส่งข้อความทั้งหมด
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=messages
+                )
+            ]
         )
     )
+
+    # 🔹 2. แล้วค่อย push รูป (แยกอีก request)
+    if p["images"]:
+        api.push_message(
+            PushMessageRequest(
+                to=event.source.user_id,
+                messages=[
+                    ImageMessage(
+                        original_content_url=p["images"][0],
+                        preview_image_url=p["images"][0]
+                    )
+                ]
+            )
+        )
 # =========================
 # 🗺 MAP
 # =========================
