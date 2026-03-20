@@ -150,10 +150,10 @@ def send_map(api, event):
                     text="🗺 เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
+                            QuickReplyItem(action=MessageAction(label=n, text=f"แผนที่_{n}"))
                             for n in names
                         ] + [
-                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
+                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="แผนที่ทั้งหมด"))
                         ]
                     )
                 )
@@ -174,10 +174,10 @@ def send_activity(api, event):
                     text="เลือกกิจกรรมที่สนใจ",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ", text="activity_pray")),
-                            QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป", text="activity_photo")),
-                            QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="activity_fish")),
-                            QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน", text="activity_eat")),
+                            QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ", text="กิจกรรม_ไหว้พระ")),
+                            QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป", text="กิจกรรม_ถ่ายรูป")),
+                            QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="กิจกรรม_ให้อาหารปลา")),
+                            QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน", text="กิจกรรม_ตะลอนกิน")),
                         ]
                     )
                 )
@@ -187,24 +187,24 @@ def send_activity(api, event):
 
 
 activity_details = {
-    "activity_pray": """🙏 ไหว้พระในท่ายาง
+    "กิจกรรม_ไหว้พระ": """🙏 ไหว้พระในท่ายาง
 
 - วัดท่าคอย
 - ศาลเจ้าพ่อกวนอู
 - ศาลเจ้าแม่ทับทิม""",
 
-    "activity_photo": """📸 จุดถ่ายรูปในท่ายาง
+    "กิจกรรม_ถ่ายรูป": """📸 จุดถ่ายรูปในท่ายาง
 
 - วัดท่าคอย
 - ศาลเจ้าพ่อกวนอู
 - ศาลเจ้าแม่ทับทิม
 - อุโบสถ 100 ปี""",
 
-    "activity_fish": """🐟 ให้อาหารปลาในท่ายาง
+    "กิจกรรม_ให้อาหารปลา": """🐟 ให้อาหารปลาในท่ายาง
 
 - อุทยานปลาวัดท่าคอย""",
 
-    "activity_eat": """🍜 ตะลอนกินในท่ายาง
+    "กิจกรรม_ตะลอนกิน": """🍜 ตะลอนกินในท่ายาง
 
 - ตลาดสดท่ายาง
 - ร้านทองม้วนแม่เล็ก
@@ -225,10 +225,10 @@ def send_info(api, event):
                     text="เลือกหัวข้อ",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="info_history")),
-                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="info_highlight")),
-                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="info_lifestyle")),
-                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="info_culture"))
+                            QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="ข้อมูล_ประวัติ")),
+                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="ข้อมูล_จุดเด่น")),
+                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="ข้อมูล_วิถีชีวิต")),
+                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="ข้อมูล_วัฒนธรรม"))
                         ]
                     )
                 )
@@ -247,16 +247,16 @@ def send_culture(api, event):
                     text="เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย", text="info_culture_wat_takhoi")),
-                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี", text="info_culture_ubosot")),
-                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="info_culture_fish_park")),
-                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง", text="info_culture_market")),
-                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก", text="info_culture_thong_muan")),
-                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="info_culture_padthai")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="info_culture_guanyu")),
-                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="info_culture_khao_chae")),
-                            QuickReplyItem(action=MessageAction(label="สกิดใจ", text="info_culture_sakit_jai")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="info_culture_tapthim"))
+                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย",          text="ข้อมูล_วัฒนธรรม_วัดท่าคอย")),
+                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี",      text="ข้อมูล_วัฒนธรรม_อุโบสถ")),
+                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="ข้อมูล_วัฒนธรรม_อุทยานปลา")),
+                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง",       text="ข้อมูล_วัฒนธรรม_ตลาดสด")),
+                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก",  text="ข้อมูล_วัฒนธรรม_ทองม้วน")),
+                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี",   text="ข้อมูล_วัฒนธรรม_ผัดไทย")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู",    text="ข้อมูล_วัฒนธรรม_กวนอู")),
+                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก",     text="ข้อมูล_วัฒนธรรม_ข้าวแช่")),
+                            QuickReplyItem(action=MessageAction(label="สกิดใจ",             text="ข้อมูล_วัฒนธรรม_สกิดใจ")),
+                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม",   text="ข้อมูล_วัฒนธรรม_ทับทิม"))
                         ]
                     )
                 )
@@ -343,29 +343,29 @@ def handle_message(event):
             return
 
         # 🔹 ตรวจสอบคำสั่งอื่นๆ
-        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
+        elif text in ["สถานที่", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
+        elif text in ["แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
-        elif text.startswith("map_"):
-            name = text.replace("map_", "")
-            url = "https://maps.google.com" if name == "all" else places[name]["map"]
+        elif text.startswith("แผนที่_"):
+            name = text.replace("แผนที่_", "")
+            url = "https://maps.google.com" if name == "ทั้งหมด" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
-        elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
+        elif text in ["กิจกรรม", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
+        elif text in ["ข้อมูล", "เกี่ยวกับอำเภอท่ายาง"]:
             send_info(api, event)
-        elif text == "info_culture":
+        elif text == "ข้อมูล_วัฒนธรรม":
             send_culture(api, event)
-        elif text.startswith("info_"):
-            key = text.replace("info_", "")
+        elif text.startswith("ข้อมูล_"):
+            key = text.replace("ข้อมูล_", "")
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -406,6 +406,13 @@ def handle_message(event):
                                 ]
                             )
                         )]
+                    )
+                )
+            elif text == "ไม่ใช่":
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ")]
                     )
                 )
             else:
