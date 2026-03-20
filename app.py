@@ -95,13 +95,9 @@ def send_place_detail(api, event, name):
 
     # 🔹 สร้าง carousel เฉพาะถ้ามีรูป
     if p["images"]:
+        messages.append(TextMessage(text="📸 รูปสถานที่:"))
         for img in p["images"]:
-            messages.append(
-                ImageMessage(
-                    original_content_url=img,
-                    preview_image_url=img
-                )
-            )
+            messages.append(TextMessage(text=img))
 
     # 🔹 ข้อมูลข้อความ
     text = TextMessage(
