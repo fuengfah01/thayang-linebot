@@ -150,10 +150,10 @@ def send_map(api, event):
                     text="🗺 เลือกสถานที่",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(action=MessageAction(label=n, text=f"แผนที่_{n}"))
+                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
                             for n in names
                         ] + [
-                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="แผนที่_ทั้งหมด"))
+                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
                         ]
                     )
                 )
@@ -347,11 +347,11 @@ def handle_message(event):
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["แผนที่", "แผนที่ภายในอำเภอท่ายาง"]:
+        elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
-        elif text.startswith("แผนที่_"):
-            name = text.replace("แผนที่_", "")
-            url = "https://maps.google.com" if name == "แผนที่ทั้งหมด" else places[name]["แผนที่"]
+        elif text.startswith("map_"):
+            name = text.replace("map_", "")
+            url = "https://maps.google.com" if name == "all" else places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
