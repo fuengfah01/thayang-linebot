@@ -243,7 +243,6 @@ def send_culture(api, event):
                             QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="info_culture_padthai")),
                             QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="info_culture_guanyu")),
                             QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="info_culture_khao_chae")),
-                            QuickReplyItem(action=MessageAction(label="สกิดใจ", text="info_culture_sakit_jai")),
                             QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="info_culture_tapthim"))
                         ]
                     )
@@ -349,13 +348,6 @@ def handle_message(event):
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
-            # url = "https://maps.google.com" if name == "all" else places[name]["map"]
-            # api.reply_message(
-            #     ReplyMessageRequest(
-            #         reply_token=event.reply_token,
-            #         messages=[TextMessage(text=f"🗺 {url}")]
-            #     )
-            # )
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
         elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
