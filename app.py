@@ -369,6 +369,14 @@ def handle_message(event):
                     messages=[TextMessage(text=activity_details[text])]
                 )
             )
+        elif text in ["ขอบคุณ", "ขอบคุณค่ะ", "ขอบคุณครับ", "ขอบคุณค่า", "ขอบคุณนะ", "thank you", "thanks"]:
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="ขอบคุณที่ส่งข้อความถึงเรา ต้องขออภัยเป็นอย่างยิ่งที่บัญชีนี้ไม่สามารถตอบข้อความใดๆ ได้ โปรดรอรับข่าวสารใหม่ๆ จากเราผ่านช่องทางนี้")]
+                )
+            )
+            
         else:
             # 🔹 fuzzy search ทั้ง places และ questions
             match_place = fuzzy_search_place(text)
