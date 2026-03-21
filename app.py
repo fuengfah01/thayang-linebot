@@ -142,7 +142,7 @@ def send_map(api, event):
                             QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
                             for n in names
                         ] + [
-                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอ", text="map_all"))
+                            QuickReplyItem(action=MessageAction(label="แผนที่อำเภอท่ายาง", text="map_all"))
                         ]
                     )
                 )
