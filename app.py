@@ -373,7 +373,7 @@ def handle_message(event):
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text="ขอบคุณที่ส่งข้อความถึงเรา ต้องขออภัยเป็นอย่างยิ่งที่บัญชีนี้ไม่สามารถตอบข้อความใดๆ ได้ โปรดรอรับข่าวสารใหม่ๆ จากเราผ่านช่องทางนี้")]
+                    messages=[TextMessage(text="ยินดีให้บริการค่ะ 🗺️💖 ขอบคุณที่แวะมาสอบถามนะคะ หวังว่าจะได้ช่วยให้การเที่ยวของคุณสนุกขึ้นนะคะ 😊")]
                 )
             )
             
