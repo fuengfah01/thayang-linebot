@@ -142,7 +142,7 @@ def send_map(api, event):
                             QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
                             for n in names
                         ] + [
-                            QuickReplyItem(action=URIAction(label="แผนที่ท่ายาง", uri=places["แผนที่อำเภอท่ายาง"]["map_all"]))
+                            QuickReplyItem(action=MessageAction(label="แผนที่ท่ายาง", text="map_all"))
                         ]
                     )
                 )
@@ -339,13 +339,23 @@ def handle_message(event):
             send_map(api, event)
         elif text.startswith("map_"):
             name = text.replace("map_", "")
-            url = "https://maps.google.com" if name == "all" else places[name]["map"]
+            if name == "all":
+                url = places["แผนที่อำเภอท่ายาง"]["map_all"]
+            else:
+                url = places[name]["map"]
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
+            # url = "https://maps.google.com" if name == "all" else places[name]["map"]
+            # api.reply_message(
+            #     ReplyMessageRequest(
+            #         reply_token=event.reply_token,
+            #         messages=[TextMessage(text=f"🗺 {url}")]
+            #     )
+            # )
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
         elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
