@@ -9,8 +9,7 @@ from info import info
 from questions import questions
 from souvenirs import souvenirs
 
-import random
-random_item = random.choice(list(souvenirs.keys()))
+import random  # 🔹 เพิ่มด้านบนไฟล์
 import os
 
 app = Flask(__name__)
@@ -62,23 +61,20 @@ def fuzzy_search_place(text):
     all_choices = []
     mapping = {}
 
-    # 🔹 places
     for name, data in places.items():
+        # ชื่อหลัก
         all_choices.append(name)
         mapping[name] = name
 
+        # keywords
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
 
+        # synonyms
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
-
-    # 🔹 souvenirs
-    for name, data in souvenirs.items():
-        all_choices.append(name)
-        mapping[name] = name
 
     result = process.extractOne(text, all_choices)
 
@@ -283,7 +279,6 @@ def send_places(api, event):
 
 def send_food(api, event):
     food_names = [name for name, p in places.items() if p.get("type") == "food"]
-
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
@@ -304,7 +299,7 @@ def send_food(api, event):
     )
 
 def send_souvenirs(api, event):
-    names = list(souvenirs.keys())[:10]
+    names = list(souvenirs.keys())
 
     api.reply_message(
         ReplyMessageRequest(
@@ -324,7 +319,6 @@ def send_souvenirs(api, event):
             ]
         )
     )
-
 
 def send_souvenir_detail(api, event, name):
     s = souvenirs[name]
@@ -346,6 +340,7 @@ def send_souvenir_detail(api, event, name):
             ]
         )
     )
+
 # =========================
 # 📩 HANDLE
 # =========================
@@ -383,16 +378,8 @@ def handle_message(event):
             name = text.replace("ใช่_", "")
             if name in places:
                 send_place_detail(api, event, name)
-            elif name in questions:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=questions[name])]
-                    )
-                )
-            elif name in souvenirs:  # 🔥 เพิ่มอันนี้
+            elif name in souvenirs:
                 send_souvenir_detail(api, event, name)
-
             elif name in questions:
                 api.reply_message(
                     ReplyMessageRequest(
@@ -410,8 +397,6 @@ def handle_message(event):
             return
 
         # 🔹 ตรวจสอบคำสั่งอื่นๆ
-        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
-            send_places(api, event)
         elif text in ["souvenir", "ของฝาก", "ของฝากท่ายาง"]:
             send_souvenirs(api, event)
 
@@ -419,6 +404,9 @@ def handle_message(event):
             name = text.replace("souvenir_", "")
             if name in souvenirs:
                 send_souvenir_detail(api, event, name)
+
+        elif text in ["travel", "สถานที่ท่องเที่ยว"]:
+            send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
         elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
@@ -437,7 +425,7 @@ def handle_message(event):
             )
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-        elif text in ["info", "เกี่ยวกับอำเภอท่ายาง"]:
+        elif text in ["info", "เกี่ยวกับเรา"]:
             send_info(api, event)
         elif text == "info_culture":
             send_culture(api, event)
