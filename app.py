@@ -299,7 +299,7 @@ def send_food(api, event):
     )
 
 def send_souvenirs(api, event):
-    names = list(souvenirs.keys())
+    names = list(souvenirs.keys())[:10]
 
     api.reply_message(
         ReplyMessageRequest(
@@ -397,19 +397,18 @@ def handle_message(event):
             return
 
         # 🔹 ตรวจสอบคำสั่งอื่นๆ
-        elif text in ["souvenir", "ของฝาก", "ของฝากท่ายาง"]:
+        elif text in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
             send_souvenirs(api, event)
 
         elif text.startswith("souvenir_"):
             name = text.replace("souvenir_", "")
             if name in souvenirs:
                 send_souvenir_detail(api, event, name)
-
         elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
-        elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
+        elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
         elif text.startswith("map_"):
             name = text.replace("map_", "")
