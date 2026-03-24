@@ -1,9 +1,3 @@
-import sys
-import io
-
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-
 from flask import Flask, request, send_from_directory
 from linebot.v3.messaging import *
 from linebot.v3.webhook import WebhookHandler
@@ -331,138 +325,34 @@ def send_souvenir_detail(api, event, name):
         )
     )
 
-# =========================
-# 🍜 FOOD FLEX CAROUSEL
-# =========================
-def make_food_bubble(name, f):
-    """สร้าง bubble 1 ร้านสำหรับ carousel"""
-    location_text, map_url = f["location"].split("|")
-    map_url = map_url.strip()
-    image_url = f.get("image", "https://via.placeholder.com/800x400?text=No+Image")
-
-    return {
-        "type": "bubble",
-        "size": "kilo",
-        "hero": {
-            "type": "image",
-            "url": image_url,
-            "size": "full",
-            "aspectRatio": "20:13",
-            "aspectMode": "cover"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "paddingAll": "12px",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": name,
-                    "weight": "bold",
-                    "size": "sm",
-                    "wrap": True,
-                    "color": "#222222"
-                },
-                {
-                    "type": "text",
-                    "text": f["description"],
-                    "size": "xs",
-                    "color": "#666666",
-                    "wrap": True,
-                    "margin": "xs"
-                },
-                {
-                    "type": "text",
-                    "text": "⭐ " + f["highlight"],
-                    "size": "xs",
-                    "color": "#aaaaaa",
-                    "wrap": True,
-                    "margin": "xs"
-                }
-            ]
-        },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "sm",
-            "paddingAll": "8px",
-            "contents": [
-                {
-                    "type": "button",
-                    "style": "primary",
-                    "height": "sm",
-                    "action": {
-                        "type": "uri",
-                        "label": "📍 ดูแผนที่",
-                        "uri": map_url
-                    }
-                }
-            ]
-        }
-    }
-
-
-def send_food_carousel(api, event):
-    """ส่ง Flex Carousel แสดงร้านอาหารทั้งหมด (LINE จำกัด 12 bubbles ต่อ carousel)"""
-    bubbles = []
-    for name, f in list(food.items())[:12]:
-        bubbles.append(make_food_bubble(name, f))
-
-    carousel = {
-        "type": "carousel",
-        "contents": bubbles
-    }
-
+def send_food_categories(api, event):
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[
-                FlexMessage(
-                    alt_text="🍜 ร้านอาหารในท่ายาง",
-                    contents=FlexContainer.from_dict(carousel)
+            messages=[TextMessage(
+                text="🍽 เลือกหมวดอาหาร",
+                quick_reply=QuickReply(
+                    items=[
+                        QuickReplyItem(action=MessageAction(label="อาหารคาว", text="category_อาหารคาว")),
+                        QuickReplyItem(action=MessageAction(label="ขนม/ของหวาน", text="category_ขนม/ของหวาน"))
+                    ]
                 )
-            ]
+            )]
+        )
+    )
+
+def send_food_category_list(api, event, category):
+    names = list(food[category].keys())
+    text = f"🍴 ร้านอาหารในหมวด {category}:\n" + "\n".join(f"- {name}" for name in names)
+    
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[TextMessage(text=text)]
         )
     )
 
 
-def send_food_detail(api, event, name):
-    """ส่ง Flex bubble เดี่ยวสำหรับร้านที่เลือก"""
-    f = food[name]
-    bubble = make_food_bubble(name, f)
-
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                FlexMessage(
-                    alt_text=name,
-                    contents=FlexContainer.from_dict(bubble)
-                )
-            ]
-        )
-    )
-
-from linebot.v3.webhooks import PostbackEvent
-
-@handler.add(PostbackEvent)
-def handle_postback(event):
-    data = event.postback.data
-
-    print("POSTBACK DATA:", data)
-
-    with ApiClient(configuration) as api_client:
-        api = MessagingApi(api_client)
-
-        if data == "food":
-            send_food_carousel(api, event)
-
-        elif data == "map":
-            send_map(api, event)
-
-        elif data == "activity":
-            send_activity(api, event)
 # =========================
 # 📩 HANDLE MESSAGE
 # =========================
@@ -509,6 +399,13 @@ def handle_message(event):
                         messages=[TextMessage(text=questions[name])]
                     )
                 )
+            elif text in ["food","อาหารแนะนำ"]:
+                send_food_categories(api, event)
+
+            elif text.startswith("category_"):
+                category = text.replace("category_", "")
+                if category in food:
+                    send_food_category_list(api, event, category)
             else:
                 api.reply_message(
                     ReplyMessageRequest(
