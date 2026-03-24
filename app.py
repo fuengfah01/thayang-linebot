@@ -282,27 +282,48 @@ def send_places(api, event):
     )
 
 def send_food(api, event):
-    def send_souvenirs(api, event):
-        names = list(souvenirs.keys())[:10]
+    food_names = [name for name, p in places.items() if p.get("type") == "food"]
 
-        api.reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[
-                    TextMessage(
-                        text="🎁 ของฝากขึ้นชื่อในท่ายาง",
-                        quick_reply=QuickReply(
-                            items=[
-                                QuickReplyItem(
-                                    action=MessageAction(label=name, text=f"souvenir_{name}")
-                                )
-                                for name in names
-                            ]
-                        )
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text="🍜 ร้านอาหารในท่ายาง",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(
+                                action=MessageAction(label=name, text=name)
+                            )
+                            for name in food_names[:10]
+                        ]
                     )
-                ]
-            )
+                )
+            ]
         )
+    )
+
+def send_souvenirs(api, event):
+    names = list(souvenirs.keys())[:10]
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text="🎁 ของฝากขึ้นชื่อในท่ายาง",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(
+                                action=MessageAction(label=name, text=f"souvenir_{name}")
+                            )
+                            for name in names
+                        ]
+                    )
+                )
+            ]
+        )
+    )
 
 
 def send_souvenir_detail(api, event, name):
@@ -337,28 +358,6 @@ def send_souvenir_detail(api, event, name):
             messages=messages[:2]
         )
     )
-
-    food_names = [name for name, p in places.items() if p.get("type") == "food"]
-
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="🍜 ร้านอาหารในท่ายาง",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(
-                                action=MessageAction(label=name, text=name)
-                            )
-                            for name in food_names[:10]
-                        ]
-                    )
-                )
-            ]
-        )
-    )
-
 
 # =========================
 # 📩 HANDLE
@@ -397,6 +396,16 @@ def handle_message(event):
             name = text.replace("ใช่_", "")
             if name in places:
                 send_place_detail(api, event, name)
+            elif name in questions:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=questions[name])]
+                    )
+                )
+            elif name in souvenirs:  # 🔥 เพิ่มอันนี้
+                send_souvenir_detail(api, event, name)
+
             elif name in questions:
                 api.reply_message(
                     ReplyMessageRequest(
