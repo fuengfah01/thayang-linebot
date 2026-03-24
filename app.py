@@ -450,18 +450,18 @@ from linebot.v3.webhooks import PostbackEvent
 def handle_postback(event):
     data = event.postback.data
 
-    print("POSTBACK DATA:", data)  # 👈 สำคัญมาก
+    print("POSTBACK DATA:", data)
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        if "food" in data:
+        if data == "food":
             send_food_carousel(api, event)
 
-        elif "map" in data:
+        elif data == "map":
             send_map(api, event)
 
-        elif "activity" in data:
+        elif data == "activity":
             send_activity(api, event)
 # =========================
 # 📩 HANDLE MESSAGE
