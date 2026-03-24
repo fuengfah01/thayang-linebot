@@ -1,3 +1,9 @@
+import sys
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 from flask import Flask, request, send_from_directory
 from linebot.v3.messaging import *
 from linebot.v3.webhook import WebhookHandler
@@ -73,7 +79,7 @@ def webhook():
     try:
         handler.handle(body, signature)
     except Exception as e:
-        print("Webhook error:", e)
+        print("Webhook error")
     return "OK"
 
 # =========================
