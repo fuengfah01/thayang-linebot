@@ -276,6 +276,55 @@ def send_places(api, event):
         )
     )
 
+def send_food(api, event):
+    food_names = [name for name, p in places.items() if p.get("type") == "food"]
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text="🍜 ร้านอาหารในท่ายาง",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(
+                                action=MessageAction(label=name, text=name)
+                            )
+                            for name in food_names[:10]
+                        ]
+                    )
+                )
+            ]
+        )
+    )
+
+def send_souvenir(api, event):
+    souvenir_names = []
+
+    for name, p in places.items():
+        if p.get("type") == "food":
+            keywords = p.get("keywords", [])
+            if any("ของฝาก" in k for k in keywords):
+                souvenir_names.append(name)
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text="🎁 ของฝากแนะนำ",
+                    quick_reply=QuickReply(
+                        items=[
+                            QuickReplyItem(
+                                action=MessageAction(label=name, text=name)
+                            )
+                            for name in souvenir_names[:10]
+                        ]
+                    )
+                )
+            ]
+        )
+    )
 # =========================
 # 📩 HANDLE
 # =========================
@@ -334,6 +383,25 @@ def handle_message(event):
             send_places(api, event)
         elif text in places:
             send_place_detail(api, event, text)
+        
+        elif text in ["food", "อาหาร", "ของกิน"]:
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text="🍜 ของกินแนะนำในท่ายาง",
+                            quick_reply=QuickReply(
+                                items=[
+                                    QuickReplyItem(action=MessageAction(label="ผัดไทย 100 ปี", text="ร้านผัดไทย 100 ปี")),
+                                    QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="ร้านข้าวแช่แม่เล็ก")),
+                                    QuickReplyItem(action=MessageAction(label="ทองม้วนแม่เล็ก", text="ร้านทองม้วนแม่เล็ก")),
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
         elif text in ["map", "แผนที่ภายในอำท่ายาง"]:
             send_map(api, event)
         elif text.startswith("map_"):
@@ -346,6 +414,23 @@ def handle_message(event):
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=f"🗺 {url}")]
+                )
+            )
+        elif text in ["souvenir", "ของฝาก"]:
+            api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(
+                            text="🎁 ของฝากขึ้นชื่อท่ายาง",
+                            quick_reply=QuickReply(
+                                items=[
+                                    QuickReplyItem(action=MessageAction(label="ทองม้วนแม่เล็ก", text="ร้านทองม้วนแม่เล็ก")),
+                                    QuickReplyItem(action=MessageAction(label="ขนมพื้นบ้าน", text="ตลาดสดท่ายาง")),
+                                ]
+                            )
+                        )
+                    ]
                 )
             )
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
