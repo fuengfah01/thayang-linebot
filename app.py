@@ -7,6 +7,7 @@ from rapidfuzz import process
 from places import places
 from info import info
 from questions import questions
+from food import food
 
 import random
 import os
@@ -340,7 +341,6 @@ def send_souvenirs(api, event):
 
 def send_souvenir_detail(api, event, name):
     s = souvenirs[name]
-
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
@@ -353,6 +353,35 @@ def send_souvenir_detail(api, event, name):
 
 📍 แหล่งที่มา:
 {s['location']}
+"""
+                )
+            ]
+        )
+    )
+
+
+def send_food_detail(api, event, name):
+    f = food[name]
+
+    location_text, map_url = f["location"].split("|")
+
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text=f"""🍜 {name}
+
+📜 รายละเอียด:
+{f['description']}
+
+⭐ จุดเด่น:
+{f['highlight']}
+
+📍 {location_text.strip()}
+
+🗺 แผนที่:
+{map_url.strip()}
 """
                 )
             ]
@@ -403,6 +432,10 @@ def handle_message(event):
                         messages=[TextMessage(text=questions[name])]
                     )
                 )
+            elif text.startswith("food_"):
+                name = text.replace("food_", "")
+                if name in food:
+                    send_food_flex(event, name)
             else:
                 api.reply_message(
                     ReplyMessageRequest(
@@ -452,6 +485,11 @@ def handle_message(event):
 
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
+        
+        elif text.startswith("food_"):
+            name = text.replace("food_", "")
+            if name in food:
+                send_food_detail(api, event, name)
 
         elif text in ["info", "เกี่ยวกับเรา"]:
             send_info(api, event)
