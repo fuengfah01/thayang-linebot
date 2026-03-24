@@ -17,14 +17,14 @@ app = Flask(__name__)
 # =========================
 # 🔑 CONFIG
 # =========================
-CHANNEL_ACCESS_TOKEN = "4daQ2JUnEe+vEmbDJhOmn48fWc7d/Kb6+iWXIm05H8ngOFqDPLyNpgdTO58cKvHyfcL/q/gytkIljJiMSjAQCvN5wmahGaLKoVocuepLo5tyQq7q33YfsPZPhxpO8kPOrpnECFRdZPB0JjHKaKaPOQdB04t89/1O/w1cDnyilFU="
+CHANNEL_ACCESS_TOKEN = "ใส่ token ใหม่ตรงนี้"
 CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
 
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
 # =========================
-# 🎁 SOUVENIRS DATA (ย้ายมาจาก souvenirs.py)
+# 🎁 SOUVENIRS DATA
 # =========================
 souvenirs = {
     "ขนมหม้อแกง": {
@@ -70,42 +70,35 @@ def home():
 def webhook():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
-
     try:
         handler.handle(body, signature)
     except Exception as e:
         print("Webhook error:", e)
-
     return "OK"
 
 # =========================
-# 🧠 AI หาใกล้เคียง
+# 🧠 FUZZY SEARCH
 # =========================
 def fuzzy_search_place(text):
     text = text.lower()
-
     all_choices = []
     mapping = {}
 
     for name, data in places.items():
         all_choices.append(name)
         mapping[name] = name
-
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
-
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
 
     result = process.extractOne(text, all_choices)
-
     if result:
         word, score, _ = result
         if score > 60:
             return mapping[word]
-
     return None
 
 # =========================
@@ -151,7 +144,6 @@ def send_place_detail(api, event, name):
 # =========================
 def send_map(api, event):
     names = list(places.keys())[:9]
-
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
@@ -273,7 +265,6 @@ def send_culture(api, event):
 
 def send_places(api, event):
     names = list(places.keys())[:9]
-
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
@@ -282,31 +273,8 @@ def send_places(api, event):
                     text="📍 เลือกสถานที่ท่องเที่ยว",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(
-                                action=MessageAction(label=name, text=name)
-                            )
+                            QuickReplyItem(action=MessageAction(label=name, text=name))
                             for name in names
-                        ]
-                    )
-                )
-            ]
-        )
-    )
-
-def send_food(api, event):
-    food_names = [name for name, p in places.items() if p.get("type") == "food"]
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="🍜 ร้านอาหารในท่ายาง",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(
-                                action=MessageAction(label=name, text=name)
-                            )
-                            for name in food_names[:10]
                         ]
                     )
                 )
@@ -319,7 +287,6 @@ def send_food(api, event):
 # =========================
 def send_souvenirs(api, event):
     names = list(souvenirs.keys())[:10]
-
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
@@ -328,9 +295,7 @@ def send_souvenirs(api, event):
                     text="🎁 ของฝากขึ้นชื่อในท่ายาง",
                     quick_reply=QuickReply(
                         items=[
-                            QuickReplyItem(
-                                action=MessageAction(label=name, text=f"souvenir_{name}")
-                            )
+                            QuickReplyItem(action=MessageAction(label=name, text=f"souvenir_{name}"))
                             for name in names
                         ]
                     )
@@ -359,37 +324,121 @@ def send_souvenir_detail(api, event, name):
         )
     )
 
-
-def send_food_detail(api, event, name):
-    f = food[name]
-
+# =========================
+# 🍜 FOOD FLEX CAROUSEL
+# =========================
+def make_food_bubble(name, f):
+    """สร้าง bubble 1 ร้านสำหรับ carousel"""
     location_text, map_url = f["location"].split("|")
+    map_url = map_url.strip()
+    image_url = f.get("image", "https://via.placeholder.com/800x400?text=No+Image")
+
+    return {
+        "type": "bubble",
+        "size": "kilo",
+        "hero": {
+            "type": "image",
+            "url": image_url,
+            "size": "full",
+            "aspectRatio": "20:13",
+            "aspectMode": "cover"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "paddingAll": "12px",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": name,
+                    "weight": "bold",
+                    "size": "sm",
+                    "wrap": True,
+                    "color": "#222222"
+                },
+                {
+                    "type": "text",
+                    "text": f["description"],
+                    "size": "xs",
+                    "color": "#666666",
+                    "wrap": True,
+                    "margin": "xs"
+                },
+                {
+                    "type": "text",
+                    "text": "⭐ " + f["highlight"],
+                    "size": "xs",
+                    "color": "#aaaaaa",
+                    "wrap": True,
+                    "margin": "xs"
+                }
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "paddingAll": "8px",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "height": "sm",
+                    "action": {
+                        "type": "uri",
+                        "label": "📍 ดูแผนที่",
+                        "uri": map_url
+                    }
+                }
+            ]
+        }
+    }
+
+
+def send_food_carousel(api, event):
+    """ส่ง Flex Carousel แสดงร้านอาหารทั้งหมด (LINE จำกัด 12 bubbles ต่อ carousel)"""
+    bubbles = []
+    for name, f in list(food.items())[:12]:
+        bubbles.append(make_food_bubble(name, f))
+
+    carousel = {
+        "type": "carousel",
+        "contents": bubbles
+    }
 
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
             messages=[
-                TextMessage(
-                    text=f"""🍜 {name}
+                FlexMessage(
+                    alt_text="🍜 ร้านอาหารในท่ายาง",
+                    contents=FlexContainer.from_dict(carousel)
+                )
+            ]
+        )
+    )
 
-📜 รายละเอียด:
-{f['description']}
 
-⭐ จุดเด่น:
-{f['highlight']}
+def send_food_detail(api, event, name):
+    """ส่ง Flex bubble เดี่ยวสำหรับร้านที่เลือก"""
+    f = food[name]
+    bubble = make_food_bubble(name, f)
 
-📍 {location_text.strip()}
-
-🗺 แผนที่:
-{map_url.strip()}
-"""
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                FlexMessage(
+                    alt_text=name,
+                    contents=FlexContainer.from_dict(bubble)
                 )
             ]
         )
     )
 
 # =========================
-# 📩 HANDLE
+# 📩 HANDLE MESSAGE
 # =========================
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
@@ -400,8 +449,9 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        # 🔹 ตอบสวัสดีแบบสุ่ม
-        if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ", "หวัดดีค่ะ", "หวัดดีงับ", "ดี", "ดีจ้า", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
+        # 🔹 สวัสดี
+        if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ",
+                             "หวัดดีค่ะ", "หวัดดีงับ", "ดี", "ดีจ้า", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
             greetings = [
                 "สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ",
                 "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ",
@@ -409,22 +459,23 @@ def handle_message(event):
                 "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ",
                 "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ"
             ]
-            reply_text = random.choice(greetings)
             api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply_text)]
+                    messages=[TextMessage(text=random.choice(greetings))]
                 )
             )
             return
 
-        # 🔹 ตรวจสอบ ใช่_ ก่อน fuzzy
+        # 🔹 ใช่_xxx → ดูรายละเอียด
         if text.startswith("ใช่_"):
             name = text.replace("ใช่_", "")
             if name in places:
                 send_place_detail(api, event, name)
             elif name in souvenirs:
                 send_souvenir_detail(api, event, name)
+            elif name in food:
+                send_food_detail(api, event, name)
             elif name in questions:
                 api.reply_message(
                     ReplyMessageRequest(
@@ -432,10 +483,6 @@ def handle_message(event):
                         messages=[TextMessage(text=questions[name])]
                     )
                 )
-            elif text.startswith("food_"):
-                name = text.replace("food_", "")
-                if name in food:
-                    send_food_flex(event, name)
             else:
                 api.reply_message(
                     ReplyMessageRequest(
@@ -445,7 +492,23 @@ def handle_message(event):
                 )
             return
 
-        # 🔹 ตรวจสอบคำสั่งต่างๆ
+        # 🔹 ร้านอาหาร → Flex Carousel
+        elif text in ["food", "ร้านอาหาร", "อาหาร", "ร้านอาหารในอำเภอท่ายาง", "กินอะไรดี"]:
+            send_food_carousel(api, event)
+
+        # 🔹 food_ชื่อร้าน → Flex bubble เดี่ยว
+        elif text.startswith("food_"):
+            name = text.replace("food_", "")
+            if name in food:
+                send_food_detail(api, event, name)
+            else:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูลร้านนี้ค่ะ")]
+                    )
+                )
+
         elif text in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
             send_souvenirs(api, event)
 
@@ -485,11 +548,6 @@ def handle_message(event):
 
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
-        
-        elif text.startswith("food_"):
-            name = text.replace("food_", "")
-            if name in food:
-                send_food_detail(api, event, name)
 
         elif text in ["info", "เกี่ยวกับเรา"]:
             send_info(api, event)
@@ -523,7 +581,7 @@ def handle_message(event):
             )
 
         else:
-            # 🔹 fuzzy search ทั้ง places และ questions
+            # 🔹 fuzzy search
             match_place = fuzzy_search_place(text)
             match_question = None
 
