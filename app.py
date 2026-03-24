@@ -329,19 +329,12 @@ def send_souvenirs(api, event):
 def send_souvenir_detail(api, event, name):
     s = souvenirs[name]
 
-    messages = []
-
-    if s["images"]:
-        messages.append(
-            ImageMessage(
-                original_content_url=s["images"][0],
-                preview_image_url=s["images"][0]
-            )
-        )
-
-    messages.append(
-        TextMessage(
-            text=f"""🎁 {name}
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[
+                TextMessage(
+                    text=f"""🎁 {name}
 
 📜 รายละเอียด:
 {s['description']}
@@ -349,16 +342,10 @@ def send_souvenir_detail(api, event, name):
 📍 แหล่งที่มา:
 {s['location']}
 """
+                )
+            ]
         )
     )
-
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=messages[:2]
-        )
-    )
-
 # =========================
 # 📩 HANDLE
 # =========================
