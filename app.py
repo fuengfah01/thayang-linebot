@@ -7,9 +7,8 @@ from rapidfuzz import process
 from places import places
 from info import info
 from questions import questions
-from souvenirs import souvenirs
 
-import random  # 🔹 เพิ่มด้านบนไฟล์
+import random
 import os
 
 app = Flask(__name__)
@@ -17,11 +16,37 @@ app = Flask(__name__)
 # =========================
 # 🔑 CONFIG
 # =========================
-CHANNEL_ACCESS_TOKEN = "4daQ2JUnEe+vEmbDJhOmn48fWc7d/Kb6+iWXIm05H8ngOFqDPLyNpgdTO58cKvHyfcL/q/gytkIljJiMSjAQCvN5wmahGaLKoVocuepLo5tyQq7q33YfsPZPhxpO8kPOrpnECFRdZPB0JjHKaKaPOQdB04t89/1O/w1cDnyilFU="
+CHANNEL_ACCESS_TOKEN = "4daQ2JUnEe+vEmbDJhOmn48fWc7d/Kb6+iWXIm05H8ngOFqDPLyNpgdTO58cKvHyfcL/q/gytkIljJiMSjAQCvN5wmahGaLKoVocuepLo5tyQq7q33YfsPZPhxpO8kPOrpnECFRdZPB0JjHKaKaPOQdB04t89/1o/w1cDnyilFU="
 CHANNEL_SECRET = "a97e9e9977b3aac81ca9af33e59bde55"
 
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
+
+# =========================
+# 🎁 SOUVENIRS DATA (ย้ายมาจาก souvenirs.py)
+# =========================
+souvenirs = {
+    "ขนมหม้อแกง": {
+        "description": "ขนมหวานขึ้นชื่อของจังหวัดเพชรบุรี ทำจากไข่ กะทิ น้ำตาลโตนด รสชาติหวานมัน หอม",
+        "location": "อำเภอท่ายาง จังหวัดเพชรบุรี"
+    },
+    "น้ำตาลโตนด": {
+        "description": "ผลิตจากต้นตาลโตนด เป็นของดีของเพชรบุรี ใช้ทำอาหารและขนมหวาน มีกลิ่นหอมเฉพาะตัว",
+        "location": "อำเภอท่ายาง จังหวัดเพชรบุรี"
+    },
+    "ขนมตาล": {
+        "description": "ขนมพื้นบ้าน ทำจากเนื้อลูกตาล มีรสหวานหอม เนื้อนุ่มฟู",
+        "location": "อำเภอท่ายาง จังหวัดเพชรบุรี"
+    },
+    "ทองม้วน": {
+        "description": "ขนมกรอบ หอมกะทิ ม้วนเป็นแท่ง เก็บได้นาน เหมาะเป็นของฝาก",
+        "location": "อำเภอท่ายาง จังหวัดเพชรบุรี"
+    },
+    "กล้วยฉาบ": {
+        "description": "กล้วยทอดกรอบ รสหวานหรือเค็ม เป็นของกินเล่นยอดนิยม",
+        "location": "อำเภอท่ายาง จังหวัดเพชรบุรี"
+    },
+}
 
 # =========================
 # 🖼 ROUTE รูปภาพ
@@ -62,16 +87,13 @@ def fuzzy_search_place(text):
     mapping = {}
 
     for name, data in places.items():
-        # ชื่อหลัก
         all_choices.append(name)
         mapping[name] = name
 
-        # keywords
         for k in data.get("keywords", []):
             all_choices.append(k)
             mapping[k] = name
 
-        # synonyms
         for s in data.get("synonyms", []):
             all_choices.append(s)
             mapping[s] = name
@@ -84,18 +106,15 @@ def fuzzy_search_place(text):
             return mapping[word]
 
     return None
-    
 
 # =========================
 # 📍 สถานที่
 # =========================
 def send_place_detail(api, event, name):
     p = places[name]
-
     messages = []
 
-    # 🔹 ส่งรูป (ต้องมาก่อน)
-    if p["images"]:
+    if p.get("images"):
         messages.append(
             ImageMessage(
                 original_content_url=p["images"][0],
@@ -103,7 +122,6 @@ def send_place_detail(api, event, name):
             )
         )
 
-    # 🔹 แล้วค่อยส่งข้อความ
     messages.append(
         TextMessage(
             text=f"""📍 {name}
@@ -123,9 +141,10 @@ def send_place_detail(api, event, name):
     api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=messages[:2]  # 🔥 จำกัดไม่เกิน 2
+            messages=messages[:2]
         )
     )
+
 # =========================
 # 🗺 MAP
 # =========================
@@ -150,6 +169,7 @@ def send_map(api, event):
             ]
         )
     )
+
 # =========================
 # 🏨 ACTIVITY
 # =========================
@@ -173,7 +193,6 @@ def send_activity(api, event):
             ]
         )
     )
-
 
 activity_details = {
     "activity_pray": """🙏 ไหว้พระในท่ายาง
@@ -225,7 +244,6 @@ def send_info(api, event):
         )
     )
 
-
 def send_culture(api, event):
     api.reply_message(
         ReplyMessageRequest(
@@ -253,7 +271,7 @@ def send_culture(api, event):
     )
 
 def send_places(api, event):
-    names = list(places.keys())[:9]  # เอา 9 ที่
+    names = list(places.keys())[:9]
 
     api.reply_message(
         ReplyMessageRequest(
@@ -264,10 +282,7 @@ def send_places(api, event):
                     quick_reply=QuickReply(
                         items=[
                             QuickReplyItem(
-                                action=MessageAction(
-                                    label=name,
-                                    text=name
-                                )
+                                action=MessageAction(label=name, text=name)
                             )
                             for name in names
                         ]
@@ -298,6 +313,9 @@ def send_food(api, event):
         )
     )
 
+# =========================
+# 🎁 SOUVENIRS
+# =========================
 def send_souvenirs(api, event):
     names = list(souvenirs.keys())[:10]
 
@@ -344,12 +362,11 @@ def send_souvenir_detail(api, event, name):
 # =========================
 # 📩 HANDLE
 # =========================
-
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     text = event.message.text.strip()
-    match = None  # 🔹 กำหนดค่าเริ่มต้น
-    is_question = False  # ตรวจสอบว่าเป็นคำถาม
+    match = None
+    is_question = False
 
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
@@ -362,7 +379,6 @@ def handle_message(event):
                 "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ",
                 "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ",
                 "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ"
-
             ]
             reply_text = random.choice(greetings)
             api.reply_message(
@@ -396,7 +412,7 @@ def handle_message(event):
                 )
             return
 
-        # 🔹 ตรวจสอบคำสั่งอื่นๆ
+        # 🔹 ตรวจสอบคำสั่งต่างๆ
         elif text in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
             send_souvenirs(api, event)
 
@@ -404,12 +420,23 @@ def handle_message(event):
             name = text.replace("souvenir_", "")
             if name in souvenirs:
                 send_souvenir_detail(api, event, name)
+            else:
+                api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูลของฝากนี้ค่ะ")]
+                    )
+                )
+
         elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
+
         elif text in places:
             send_place_detail(api, event, text)
+
         elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
+
         elif text.startswith("map_"):
             name = text.replace("map_", "")
             if name == "all":
@@ -422,12 +449,16 @@ def handle_message(event):
                     messages=[TextMessage(text=f"🗺 {url}")]
                 )
             )
+
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
+
         elif text in ["info", "เกี่ยวกับเรา"]:
             send_info(api, event)
+
         elif text == "info_culture":
             send_culture(api, event)
+
         elif text.startswith("info_"):
             key = text.replace("info_", "")
             api.reply_message(
@@ -436,6 +467,7 @@ def handle_message(event):
                     messages=[TextMessage(text=info[key])]
                 )
             )
+
         elif text in activity_details:
             api.reply_message(
                 ReplyMessageRequest(
@@ -443,6 +475,7 @@ def handle_message(event):
                     messages=[TextMessage(text=activity_details[text])]
                 )
             )
+
         elif text in ["ขอบคุณ", "ขอบคุณค่ะ", "ขอบคุณครับ", "ขอบคุณค่า", "ขอบคุณนะ", "thank you", "thanks"]:
             api.reply_message(
                 ReplyMessageRequest(
@@ -450,12 +483,12 @@ def handle_message(event):
                     messages=[TextMessage(text="ยินดีให้บริการค่ะ 🗺️💖 ขอบคุณที่แวะมาสอบถามนะคะ หวังว่าจะได้ช่วยให้การเที่ยวของคุณสนุกขึ้นนะคะ 😊")]
                 )
             )
-            
+
         else:
             # 🔹 fuzzy search ทั้ง places และ questions
             match_place = fuzzy_search_place(text)
             match_question = None
-            # ตรวจสอบคำถามใกล้เคียง
+
             if not match_place:
                 match_question = process.extractOne(text, list(questions.keys()))
                 if match_question and match_question[1] > 60:
@@ -465,7 +498,6 @@ def handle_message(event):
                 match = match_place
 
             if match:
-                # 🔹 quick reply ใช้เหมือนกัน
                 api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
