@@ -229,7 +229,8 @@ def send_info(api, event):
                             QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="info_history")),
                             QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="info_highlight")),
                             QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="info_lifestyle")),
-                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="info_culture"))
+                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="info_culture")),
+                            QuickReplyItem(action=MessageAction(label="📞 ติดต่อเรา", text="info_contact")),
                         ]
                     )
                 )
