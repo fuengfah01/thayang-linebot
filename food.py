@@ -1,10 +1,16 @@
 food = {
     "อาหารคาว": {
-        "ผัดไทย": {
-            "description": "ผัดไทยเส้นจันท์เหนียวนุ่ม ผัดกับซอสสูตรเข้มข้น หอมกลิ่นกระทะ ใส่กุ้งแห้ง ถั่วงอก และไข่ รสชาติกลมกล่อมแบบต้นตำรับ",
-            "highlight": "รสหวานเค็มเปรี้ยวลงตัว หอมกระทะสไตล์ท่ายาง",
-            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/padthaifood.png",
-            "location": "ร้านผัดไทยท่ายาง | https://maps.google.com/?q=ผัดไทย+ท่ายาง"
+            "ผัดไทย 100 ปี": {
+            "description": "ผัดไทยสูตรดั้งเดิม เส้นเหนียวนุ่ม",
+            "highlight": "ร้านเก่าแก่ รสชาติเป็นเอกลักษณ์",
+            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/padthai1.png",
+            "location": "ร้านผัดไทย 100 ปี | https://maps.google.com/?q=ผัดไทย+100+ปี+ท่ายาง"
+        },
+        "ข้าวแช่แม่เล็ก": {
+            "description": "ข้าวแช่สูตรโบราณ หอมเย็นสดชื่น",
+            "highlight": "เหมาะกับอากาศร้อน",
+            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/kaoch1.jpg",
+            "location": "ร้านข้าวแช่แม่เล็ก | https://maps.google.com/?q=ข้าวแช่แม่เล็ก+ท่ายาง"
         },
         "ก๋วยเตี๋ยวเรือ": {
             "description": "ก๋วยเตี๋ยวเรือน้ำซุปเข้มข้น หอมเครื่องเทศ",
@@ -69,18 +75,6 @@ food = {
     },
 
     "ขนม/ของหวาน": {
-        "ผัดไทย 100 ปี": {
-            "description": "ผัดไทยสูตรดั้งเดิม เส้นเหนียวนุ่ม",
-            "highlight": "ร้านเก่าแก่ รสชาติเป็นเอกลักษณ์",
-            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/padthai1.png",
-            "location": "ร้านผัดไทย 100 ปี | https://maps.google.com/?q=ผัดไทย+100+ปี+ท่ายาง"
-        },
-        "ข้าวแช่แม่เล็ก": {
-            "description": "ข้าวแช่สูตรโบราณ หอมเย็นสดชื่น",
-            "highlight": "เหมาะกับอากาศร้อน",
-            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/kaoch1.jpg",
-            "location": "ร้านข้าวแช่แม่เล็ก | https://maps.google.com/?q=ข้าวแช่แม่เล็ก+ท่ายาง"
-        },
         "ทองม้วนแม่เล็ก": {
             "description": "ทองม้วนกรอบ หอมกะทิ",
             "highlight": "ทำสดใหม่ทุกวัน",
