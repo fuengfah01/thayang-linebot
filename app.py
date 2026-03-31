@@ -1,5 +1,10 @@
 from flask import Flask, request, send_from_directory
-from linebot.v3.messaging import *
+from linebot.v3.messaging import (
+    ApiClient, Configuration, MessagingApi,
+    ReplyMessageRequest,
+    TextMessage, ImageMessage,
+    QuickReply, QuickReplyItem, MessageAction,
+)
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from rapidfuzz import process
@@ -8,6 +13,7 @@ from places import places
 from info import info
 from questions import questions
 from food import food
+from ai_helper import ask_ai
 
 import random
 import os
@@ -50,11 +56,34 @@ souvenirs = {
 }
 
 # =========================
+# 🛠 HELPERS
+# =========================
+
+def _reply(api, event, messages: list):
+    """ส่งข้อความตอบกลับ (รองรับสูงสุด 5 messages ต่อครั้ง)"""
+    api.reply_message(
+        ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=messages[:5],
+        )
+    )
+
+
+def _text(msg: str) -> TextMessage:
+    return TextMessage(text=msg)
+
+
+def _image(url: str) -> ImageMessage:
+    return ImageMessage(original_content_url=url, preview_image_url=url)
+
+
+# =========================
 # 🖼 ROUTE รูปภาพ
 # =========================
 @app.route('/image/<path:filename>')
 def serve_image(filename):
     return send_from_directory('image', filename)
+
 
 # =========================
 # 🌐 HOME
@@ -62,6 +91,7 @@ def serve_image(filename):
 @app.route("/")
 def home():
     return "LINE BOT RUNNING"
+
 
 # =========================
 # 🔗 WEBHOOK
@@ -75,6 +105,7 @@ def webhook():
     except Exception as e:
         print("Webhook error:", e)
     return "OK"
+
 
 # =========================
 # 🧠 FUZZY SEARCH
@@ -101,326 +132,241 @@ def fuzzy_search_place(text):
             return mapping[word]
     return None
 
+
 # =========================
-# 📍 สถานที่
+# 📍 สถานที่ — แยก bubble
 # =========================
 def send_place_detail(api, event, name):
     p = places[name]
-    messages = []
+    msgs = []
 
+    # 1) รูปภาพ
     if p.get("images"):
-        messages.append(
-            ImageMessage(
-                original_content_url=p["images"][0],
-                preview_image_url=p["images"][0]
-            )
-        )
+        msgs.append(_image(p["images"][0]))
 
-    messages.append(
-        TextMessage(
-            text=f"""📍 {name}
+    # 2) ประวัติ
+    msgs.append(_text(f"📜 ประวัติ {name}\n\n{p['history']}"))
 
-📜 ประวัติ:
-{p['history']}
+    # 3) จุดเด่น + เวลา
+    msgs.append(_text(
+        f"⭐ จุดเด่น\n{p['highlight']}\n\n"
+        f"⏰ เวลาทำการ\n{p.get('time', 'ไม่ระบุ')}"
+    ))
 
-⭐ จุดเด่น:
-{p['highlight']}
+    # 4) แผนที่ (ถ้ามี)
+    if p.get("map"):
+        msgs.append(_text(f"🗺 แผนที่\n{p['map']}"))
 
-⏰ เวลา:
-{p['time']}
-"""
-        )
-    )
+    _reply(api, event, msgs)
 
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=messages[:2]
-        )
-    )
 
 # =========================
 # 🗺 MAP
 # =========================
 def send_map(api, event):
     names = list(places.keys())[:9]
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="🗺 เลือกสถานที่",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label=n, text=f"map_{n}"))
-                            for n in names
-                        ] + [
-                            QuickReplyItem(action=MessageAction(label="แผนที่ท่ายาง", text="map_all"))
-                        ]
-                    )
-                )
-            ]
+    _reply(api, event, [
+        TextMessage(
+            text="🗺 เลือกสถานที่ที่ต้องการดูแผนที่ค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label=n, text=n))
+                for n in names
+            ] + [
+                QuickReplyItem(action=MessageAction(label="ภาพรวมท่ายาง", text="แผนที่ท่ายางทั้งหมด"))
+            ])
         )
-    )
+    ])
+
 
 # =========================
-# 🏨 ACTIVITY
+# 🏃 ACTIVITY
 # =========================
-def send_activity(api, event):
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(text="🧭 กิจกรรมแนะนำในท่ายาง"),
-                TextMessage(
-                    text="เลือกกิจกรรมที่สนใจ",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ", text="activity_pray")),
-                            QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป", text="activity_photo")),
-                            QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="activity_fish")),
-                            QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน", text="activity_eat")),
-                        ]
-                    )
-                )
-            ]
-        )
-    )
-
 activity_details = {
-    "activity_pray": """🙏 ไหว้พระในท่ายาง
-
-- วัดท่าคอย
-- ศาลเจ้าพ่อกวนอู
-- ศาลเจ้าแม่ทับทิม""",
-
-    "activity_photo": """📸 จุดถ่ายรูปในท่ายาง
-
-- วัดท่าคอย
-- ศาลเจ้าพ่อกวนอู
-- ศาลเจ้าแม่ทับทิม
-- อุโบสถ 100 ปี""",
-
-    "activity_fish": """🐟 ให้อาหารปลาในท่ายาง
-
-- อุทยานปลาวัดท่าคอย""",
-
-    "activity_eat": """🍜 ตะลอนกินในท่ายาง
-
-- ตลาดสดท่ายาง
-- ร้านทองม้วนแม่เล็ก
-- ร้านผัดไทย 100 ปี
-- ร้านข้าวแช่แม่เล็ก สกิดใจ""",
+    "ไหว้พระในท่ายาง":    "🙏 ไหว้พระในท่ายาง\n\n• วัดท่าคอย\n• ศาลเจ้าพ่อกวนอู\n• ศาลเจ้าแม่ทับทิม",
+    "ถ่ายรูปในท่ายาง":    "📸 จุดถ่ายรูปในท่ายาง\n\n• วัดท่าคอย\n• ศาลเจ้าพ่อกวนอู\n• ศาลเจ้าแม่ทับทิม\n• อุโบสถ 100 ปี",
+    "ให้อาหารปลาในท่ายาง": "🐟 ให้อาหารปลาในท่ายาง\n\n• อุทยานปลาวัดท่าคอย",
+    "ตะลอนกินในท่ายาง":   "🍜 ตะลอนกินในท่ายาง\n\n• ตลาดสดท่ายาง\n• ร้านทองม้วนแม่เล็ก\n• ร้านผัดไทย 100 ปี\n• ร้านข้าวแช่แม่เล็ก สกิดใจ",
 }
+
+
+def send_activity(api, event):
+    _reply(api, event, [
+        _text("🧭 กิจกรรมแนะนำในท่ายาง"),
+        TextMessage(
+            text="👇 กดเลือกกิจกรรมที่สนใจได้เลยค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ",       text="ไหว้พระในท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป",        text="ถ่ายรูปในท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา",   text="ให้อาหารปลาในท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน",      text="ตะลอนกินในท่ายาง")),
+            ])
+        )
+    ])
+
 
 # =========================
 # 📖 INFO
 # =========================
+# mapping ชื่อภาษาไทยที่ผู้ใช้กด → key ใน info dict
+INFO_KEY_MAP = {
+    "ประวัติท่ายาง":   "history",
+    "จุดเด่นท่ายาง":   "highlight",
+    "วิถีชีวิตท่ายาง": "lifestyle",
+    "ติดต่อท่ายาง":    "contact",
+}
+
+# mapping ชื่อสถานที่ (หลัง "วัฒนธรรม ") → key ใน info dict
+CULTURE_KEY_MAP = {
+    "วัดท่าคอย":              "culture_wat_takhoi",
+    "อุโบสถ 100 ปี":         "culture_ubosot",
+    "อุทยานปลาวัดท่าคอย":   "culture_fish_park",
+    "ตลาดสดท่ายาง":          "culture_market",
+    "ร้านทองม้วนแม่เล็ก":    "culture_thong_muan",
+    "ร้านผัดไทย 100 ปี":     "culture_padthai",
+    "ศาลเจ้าพ่อกวนอู":       "culture_guanyu",
+    "ข้าวแช่แม่เล็ก":         "culture_khao_chae",
+    "ศาลเจ้าแม่ทับทิม":      "culture_tapthim",
+}
+
+
 def send_info(api, event):
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(text="📖 เกี่ยวกับท่ายาง"),
-                TextMessage(
-                    text="เลือกหัวข้อ",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label="📜 ประวัติ", text="info_history")),
-                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น", text="info_highlight")),
-                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="info_lifestyle")),
-                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="info_culture")),
-                            QuickReplyItem(action=MessageAction(label="📞 ติดต่อเรา", text="info_contact")),
-                        ]
-                    )
-                )
-            ]
+    _reply(api, event, [
+        _text("📖 เกี่ยวกับอำเภอท่ายาง"),
+        TextMessage(
+            text="👇 กดเลือกหัวข้อที่สนใจได้เลยค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label="📜 ประวัติ",   text="ประวัติท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น",   text="จุดเด่นท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="วิถีชีวิตท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="วัฒนธรรมท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="📞 ติดต่อเรา", text="ติดต่อท่ายาง")),
+            ])
         )
-    )
+    ])
+
 
 def send_culture(api, event):
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(text="🏛️ วัฒนธรรมท่ายาง"),
-                TextMessage(
-                    text="เลือกสถานที่",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label="วัดท่าคอย", text="info_culture_wat_takhoi")),
-                            QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี", text="info_culture_ubosot")),
-                            QuickReplyItem(action=MessageAction(label="อุทยานปลาวัดท่าคอย", text="info_culture_fish_park")),
-                            QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง", text="info_culture_market")),
-                            QuickReplyItem(action=MessageAction(label="ร้านทองม้วนแม่เล็ก", text="info_culture_thong_muan")),
-                            QuickReplyItem(action=MessageAction(label="ร้านผัดไทย 100 ปี", text="info_culture_padthai")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู", text="info_culture_guanyu")),
-                            QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก", text="info_culture_khao_chae")),
-                            QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="info_culture_tapthim"))
-                        ]
-                    )
-                )
-            ]
+    _reply(api, event, [
+        _text("🏛️ วัฒนธรรมท่ายาง"),
+        TextMessage(
+            text="👇 กดเลือกสถานที่/ร้านที่สนใจค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label="วัดท่าคอย",           text="วัฒนธรรม วัดท่าคอย")),
+                QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี",       text="วัฒนธรรม อุโบสถ 100 ปี")),
+                QuickReplyItem(action=MessageAction(label="อุทยานปลา",           text="วัฒนธรรม อุทยานปลาวัดท่าคอย")),
+                QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง",       text="วัฒนธรรม ตลาดสดท่ายาง")),
+                QuickReplyItem(action=MessageAction(label="ทองม้วนแม่เล็ก",     text="วัฒนธรรม ร้านทองม้วนแม่เล็ก")),
+                QuickReplyItem(action=MessageAction(label="ผัดไทย 100 ปี",      text="วัฒนธรรม ร้านผัดไทย 100 ปี")),
+                QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู",    text="วัฒนธรรม ศาลเจ้าพ่อกวนอู")),
+                QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก",     text="วัฒนธรรม ข้าวแช่แม่เล็ก")),
+                QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม",   text="วัฒนธรรม ศาลเจ้าแม่ทับทิม")),
+            ])
         )
-    )
+    ])
+
 
 def send_places(api, event):
     names = list(places.keys())[:9]
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="📍 เลือกสถานที่ท่องเที่ยว",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label=name, text=name))
-                            for name in names
-                        ]
-                    )
-                )
-            ]
+    _reply(api, event, [
+        TextMessage(
+            text="📍 เลือกสถานที่ท่องเที่ยวในท่ายางค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label=name, text=name))
+                for name in names
+            ])
         )
-    )
+    ])
+
 
 # =========================
-# 🎁 SOUVENIRS
+# 🎁 SOUVENIRS — แยก bubble
 # =========================
 def send_souvenirs(api, event):
     names = list(souvenirs.keys())[:10]
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="🎁 ของฝากขึ้นชื่อในท่ายาง",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label=name, text=f"souvenir_{name}"))
-                            for name in names
-                        ]
-                    )
-                )
-            ]
+    _reply(api, event, [
+        TextMessage(
+            text="🎁 ของฝากขึ้นชื่อในท่ายาง\nกดเลือกรายการได้เลยค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label=name, text=f"ของฝาก {name}"))
+                for name in names
+            ])
         )
-    )
+    ])
+
 
 def send_souvenir_detail(api, event, name):
     s = souvenirs[name]
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text=f"""🎁 {name}
+    _reply(api, event, [
+        _text(f"🎁 {name}"),
+        _text(f"📜 รายละเอียด\n{s['description']}"),
+        _text(f"📍 แหล่งที่มา\n{s['location']}"),
+    ])
 
-📜 รายละเอียด:
-{s['description']}
-
-📍 แหล่งที่มา:
-{s['location']}
-"""
-                )
-            ]
-        )
-    )
 
 # =========================
-# 🍽 FOOD — แก้ไขใหม่ทั้งหมด
+# 🍽 FOOD — แยก bubble
 # =========================
-
 def send_food_categories(api, event):
-    """แสดงปุ่มเลือกหมวดอาหาร: อาหารคาว / ขนม-ของหวาน"""
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text="🍽 อาหารในอำเภอท่ายาง\nเลือกหมวดที่สนใจได้เลยค่ะ",
-                    quick_reply=QuickReply(
-                        items=[
-                            QuickReplyItem(action=MessageAction(label="🍛 อาหารคาว", text="category_อาหารคาว")),
-                            QuickReplyItem(action=MessageAction(label="🍮 ขนม/ของหวาน", text="category_ขนม/ของหวาน")),
-                        ]
-                    )
-                )
-            ]
+    _reply(api, event, [
+        TextMessage(
+            text="🍽 อาหารในอำเภอท่ายาง\nเลือกหมวดที่สนใจได้เลยค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label="🍛 อาหารคาว",     text="หมวดอาหาร อาหารคาว")),
+                QuickReplyItem(action=MessageAction(label="🍮 ขนม/ของหวาน", text="หมวดอาหาร ขนม/ของหวาน")),
+            ])
         )
-    )
+    ])
+
 
 def send_food_category_list(api, event, category):
-    """แสดงรายการเมนูในหมวดนั้น พร้อมปุ่ม Quick Reply ให้กดเลือกแต่ละเมนู"""
     if category not in food:
-        api.reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text="ขอโทษค่ะ ไม่พบหมวดนี้ค่ะ")]
-            )
-        )
+        _reply(api, event, [_text("ขอโทษค่ะ ไม่พบหมวดนี้ค่ะ")])
         return
 
     items_in_category = food[category]
     names = list(items_in_category.keys())
 
-    # Quick Reply รองรับสูงสุด 13 ปุ่ม ตัด label ที่ยาวเกิน 20 ตัวอักษร
     quick_items = []
     for name in names[:13]:
         label = name if len(name) <= 20 else name[:19] + "…"
         quick_items.append(
-            QuickReplyItem(action=MessageAction(label=label, text=f"food_{category}_{name}"))
+            QuickReplyItem(action=MessageAction(label=label, text=f"เมนู {category} {name}"))
         )
 
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[
-                TextMessage(
-                    text=f"🍴 {category} ในท่ายาง มีดังนี้ค่ะ\n" +
-                         "\n".join(f"• {n}" for n in names) +
-                         "\n\n👆 กดเลือกเมนูที่สนใจได้เลยค่ะ",
-                    quick_reply=QuickReply(items=quick_items)
-                )
-            ]
+    _reply(api, event, [
+        TextMessage(
+            text=(
+                f"🍴 {category} ในท่ายาง\n\n" +
+                "\n".join(f"• {n}" for n in names) +
+                "\n\n👆 กดเลือกเมนูที่สนใจได้เลยค่ะ"
+            ),
+            quick_reply=QuickReply(items=quick_items)
         )
-    )
+    ])
+
 
 def send_food_detail(api, event, category, name):
-    """แสดงรายละเอียดเมนูอาหาร พร้อมรูปภาพ"""
     item = food[category][name]
-    messages = []
+    msgs = []
 
-    # รูปภาพ (ถ้ามี)
+    # 1) รูปภาพ
     if item.get("image"):
-        messages.append(
-            ImageMessage(
-                original_content_url=item["image"],
-                preview_image_url=item["image"]
-            )
-        )
+        msgs.append(_image(item["image"]))
 
-    # ข้อความรายละเอียด
-    messages.append(
-        TextMessage(
-            text=f"""🍽 {name}
+    # 2) ชื่อเมนู
+    msgs.append(_text(f"🍽 {name}"))
 
-📜 รายละเอียด:
-{item['description']}
+    # 3) รายละเอียด
+    msgs.append(_text(f"📜 รายละเอียด\n{item['description']}"))
 
-⭐ จุดเด่น:
-{item['highlight']}
+    # 4) จุดเด่น
+    msgs.append(_text(f"⭐ จุดเด่น\n{item['highlight']}"))
 
-📍 สถานที่:
-{item['location']}
-"""
-        )
-    )
+    # 5) สถานที่
+    msgs.append(_text(f"📍 สถานที่\n{item['location']}"))
 
-    api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=messages[:2]
-        )
-    )
+    _reply(api, event, msgs)
+
 
 # =========================
 # 📩 HANDLE MESSAGE
@@ -432,50 +378,41 @@ def handle_message(event):
     with ApiClient(configuration) as api_client:
         api = MessagingApi(api_client)
 
-        # ─── สวัสดี ────────────────────────────────────────────────
+        # ─── สวัสดี ───────────────────────────────────────────────────────
         if text.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ",
                              "หวัดดีค่ะ", "หวัดดีงับ", "ดี", "ดีจ้า", "หวัดดีคับ", "หวัดดี", "hi", "hello"]:
             greetings = [
-                "สวัสดีค่ะน้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ",
-                "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ",
-                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ",
-                "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ",
-                "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ"
+                "สวัสดีค่ะ น้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ 😊",
+                "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ ✨",
+                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ 🌟",
+                "สวัสดีค่า น้องเพชรมาแล้วค่ะ! วันนี้มีอะไรให้ช่วยดูแลในท่ายาง บอกน้องเพชรได้เลยนะ 💎",
+                "ยินดีต้อนรับสู่ท่ายางนะคะ น้องเพชรพร้อมเป็นไกด์ส่วนตัวให้คุณแล้วค่ะ 🗺️",
             ]
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=random.choice(greetings))]
-                )
-            )
+            _reply(api, event, [_text(random.choice(greetings))])
 
-        # ─── ขอบคุณ ───────────────────────────────────────────────
+        # ─── ขอบคุณ ──────────────────────────────────────────────────────
         elif text in ["ขอบคุณ", "ขอบคุณค่ะ", "ขอบคุณครับ", "ขอบคุณค่า", "ขอบคุณนะ", "thank you", "thanks"]:
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text="ยินดีให้บริการค่ะ 🗺️💖 ขอบคุณที่แวะมาสอบถามนะคะ หวังว่าจะได้ช่วยให้การเที่ยวของคุณสนุกขึ้นนะคะ 😊")]
-                )
-            )
+            _reply(api, event, [_text(
+                "ยินดีให้บริการค่ะ 🗺️💖 ขอบคุณที่แวะมาสอบถามนะคะ "
+                "หวังว่าจะได้ช่วยให้การเที่ยวของคุณสนุกขึ้นนะคะ 😊"
+            )])
 
-        # ─── ร้านอาหาร / food ─────────────────────────────────────
+        # ─── อาหาร ───────────────────────────────────────────────────────
         elif text in ["food", "ร้านอาหาร", "อาหาร", "ร้านอาหารในอำเภอท่ายาง", "กินอะไรดี", "อาหารแนะนำ"]:
             send_food_categories(api, event)
 
-        # ─── category_xxx → รายการเมนูในหมวด ─────────────────────
-        elif text.startswith("category_"):
-            category = text.replace("category_", "", 1)
+        # ─── หมวดอาหาร xxx → รายการเมนู ─────────────────────────────────
+        elif text.startswith("หมวดอาหาร "):
+            category = text.replace("หมวดอาหาร ", "", 1)
             send_food_category_list(api, event, category)
 
-        # ─── food_หมวด_ชื่อ → รายละเอียดเมนู ──────────────────────
-        # รูปแบบ: food_อาหารคาว_ก๋วยเตี๋ยวเรือ
-        elif text.startswith("food_"):
-            rest = text[len("food_"):]          # "อาหารคาว_ก๋วยเตี๋ยวเรือ"
-            # หา category ที่ตรงกับ prefix ใน food dict
+        # ─── เมนู หมวด ชื่อ → รายละเอียด ────────────────────────────────
+        elif text.startswith("เมนู "):
+            rest = text[len("เมนู "):]
             matched_cat = None
             matched_name = None
             for cat in food:
-                prefix = cat + "_"
+                prefix = cat + " "
                 if rest.startswith(prefix):
                     matched_cat = cat
                     matched_name = rest[len(prefix):]
@@ -483,90 +420,63 @@ def handle_message(event):
             if matched_cat and matched_name in food[matched_cat]:
                 send_food_detail(api, event, matched_cat, matched_name)
             else:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูลเมนูนี้ค่ะ")]
-                    )
-                )
+                _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลเมนูนี้ค่ะ")])
 
-        # ─── ของฝาก ───────────────────────────────────────────────
+        # ─── ของฝาก ──────────────────────────────────────────────────────
         elif text in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
             send_souvenirs(api, event)
 
-        elif text.startswith("souvenir_"):
-            name = text.replace("souvenir_", "", 1)
+        elif text.startswith("ของฝาก "):
+            name = text.replace("ของฝาก ", "", 1)
             if name in souvenirs:
                 send_souvenir_detail(api, event, name)
             else:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูลของฝากนี้ค่ะ")]
-                    )
-                )
+                _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลของฝากนี้ค่ะ")])
 
-        # ─── สถานที่ ───────────────────────────────────────────────
+        # ─── สถานที่ ──────────────────────────────────────────────────────
         elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
 
         elif text in places:
             send_place_detail(api, event, text)
 
-        # ─── แผนที่ ────────────────────────────────────────────────
+        # ─── แผนที่ ───────────────────────────────────────────────────────
         elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
 
-        elif text.startswith("map_"):
-            name = text.replace("map_", "", 1)
-            if name == "all":
-                url = places["แผนที่อำเภอท่ายาง"]["map_all"]
-            else:
-                url = places[name]["map"]
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"🗺 {url}")]
-                )
-            )
+        elif text == "แผนที่ท่ายางทั้งหมด":
+            url = places["แผนที่อำเภอท่ายาง"]["map_all"]
+            _reply(api, event, [_text(f"🗺 แผนที่อำเภอท่ายาง\n{url}")])
 
-        # ─── กิจกรรม ───────────────────────────────────────────────
+        # ─── กิจกรรม ──────────────────────────────────────────────────────
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
             send_activity(api, event)
 
         elif text in activity_details:
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=activity_details[text])]
-                )
-            )
+            _reply(api, event, [_text(activity_details[text])])
 
-        # ─── info ──────────────────────────────────────────────────
+        # ─── info ─────────────────────────────────────────────────────────
         elif text in ["info", "เกี่ยวกับเรา"]:
             send_info(api, event)
 
-        elif text == "info_culture":
+        elif text == "วัฒนธรรมท่ายาง":
             send_culture(api, event)
 
-        elif text.startswith("info_"):
-            key = text.replace("info_", "", 1)
-            if key in info:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=info[key])]
-                    )
-                )
-            else:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")]
-                    )
-                )
+        # ─── info หัวข้อ (ชื่อไทย) ─────────────────────────────────────
+        elif text in INFO_KEY_MAP:
+            key = INFO_KEY_MAP[text]
+            _reply(api, event, [_text(info.get(key, "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ"))])
 
-        # ─── ใช่_xxx → ยืนยัน fuzzy match ─────────────────────────
+        # ─── วัฒนธรรม ชื่อสถานที่ ─────────────────────────────────────────
+        elif text.startswith("วัฒนธรรม "):
+            place_name = text.replace("วัฒนธรรม ", "", 1)
+            key = CULTURE_KEY_MAP.get(place_name)
+            if key and key in info:
+                _reply(api, event, [_text(info[key])])
+            else:
+                _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
+
+        # ─── ใช่_xxx → ยืนยัน fuzzy match ────────────────────────────────
         elif text.startswith("ใช่_"):
             name = text.replace("ใช่_", "", 1)
             if name in places:
@@ -574,30 +484,15 @@ def handle_message(event):
             elif name in souvenirs:
                 send_souvenir_detail(api, event, name)
             elif name in questions:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=questions[name])]
-                    )
-                )
+                _reply(api, event, [_text(questions[name])])
             else:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text="ขอโทษค่ะ ไม่พบข้อมูล")]
-                    )
-                )
+                _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูล")])
 
-        # ─── ไม่ใช่ ────────────────────────────────────────────────
+        # ─── ไม่ใช่ ───────────────────────────────────────────────────────
         elif text == "ไม่ใช่":
-            api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text="ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ")]
-                )
-            )
+            _reply(api, event, [_text("ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ 😊")])
 
-        # ─── Fuzzy search ──────────────────────────────────────────
+        # ─── Fuzzy → AI fallback ──────────────────────────────────────────
         else:
             match_place = fuzzy_search_place(text)
             match = None
@@ -612,27 +507,20 @@ def handle_message(event):
                 match = match_place
 
             if match:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(
-                            text=f"คุณหมายถึง {match} ใช่ไหมคะ",
-                            quick_reply=QuickReply(
-                                items=[
-                                    QuickReplyItem(action=MessageAction(label="ใช่", text=f"ใช่_{match}")),
-                                    QuickReplyItem(action=MessageAction(label="ไม่ใช่", text="ไม่ใช่"))
-                                ]
-                            )
-                        )]
+                _reply(api, event, [
+                    TextMessage(
+                        text=f"คุณหมายถึง {match} ใช่ไหมคะ?",
+                        quick_reply=QuickReply(items=[
+                            QuickReplyItem(action=MessageAction(label="✅ ใช่", text=f"ใช่_{match}")),
+                            QuickReplyItem(action=MessageAction(label="❌ ไม่ใช่", text="ไม่ใช่")),
+                        ])
                     )
-                )
+                ])
             else:
-                api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text="ขอโทษค่ะ ไม่เข้าใจคำถาม กรุณาพิมพ์ใหม่นะคะ")]
-                    )
-                )
+                # 🤖 ส่งให้ AI ตอบอิสระ
+                ai_answer = ask_ai(text)
+                _reply(api, event, [_text(ai_answer)])
+
 
 # =========================
 # 🚀 RUN
