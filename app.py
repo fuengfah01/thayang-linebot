@@ -153,10 +153,6 @@ def send_place_detail(api, event, name):
         f"⏰ เวลาทำการ\n{p.get('time', 'ไม่ระบุ')}"
     ))
 
-    # 4) แผนที่ (ถ้ามี)
-    if p.get("map"):
-        msgs.append(_text(f"🗺 แผนที่\n{p['map']}"))
-
     _reply(api, event, msgs)
 
 
@@ -164,12 +160,13 @@ def send_place_detail(api, event, name):
 # 🗺 MAP
 # =========================
 def send_map(api, event):
-    names = list(places.keys())[:9]
+    # กรองเฉพาะสถานที่ที่มีข้อมูล map
+    names = [n for n in list(places.keys()) if places[n].get("map")][:9]
     _reply(api, event, [
         TextMessage(
             text="🗺 เลือกสถานที่ที่ต้องการดูแผนที่ค่ะ",
             quick_reply=QuickReply(items=[
-                QuickReplyItem(action=MessageAction(label=n, text=n))
+                QuickReplyItem(action=MessageAction(label=n, text=f"แผนที่ {n}"))
                 for n in names
             ] + [
                 QuickReplyItem(action=MessageAction(label="ภาพรวมท่ายาง", text="แผนที่ท่ายางทั้งหมด"))
@@ -447,6 +444,13 @@ def handle_message(event):
         elif text == "แผนที่ท่ายางทั้งหมด":
             url = places["แผนที่อำเภอท่ายาง"]["map_all"]
             _reply(api, event, [_text(f"🗺 แผนที่อำเภอท่ายาง\n{url}")])
+
+        elif text.startswith("แผนที่ "):
+            place_name = text.replace("แผนที่ ", "", 1)
+            if place_name in places and places[place_name].get("map"):
+                _reply(api, event, [_text(f"🗺 แผนที่ {place_name}\n{places[place_name]['map']}")])
+            else:
+                _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลแผนที่ของสถานที่นี้ค่ะ")])
 
         # ─── กิจกรรม ──────────────────────────────────────────────────────
         elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
