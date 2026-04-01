@@ -350,17 +350,19 @@ def send_food_detail(api, event, category, name):
     if item.get("image"):
         msgs.append(_image(item["image"]))
 
-    # 2) ชื่อเมนู
-    msgs.append(_text(f"🍽 {name}"))
+    # 2) ชื่อเมนู + รายละเอียด + จุดเด่น
+    msgs.append(_text(
+        f"🍽 {name}\n\n"
+        f"📜 {item['description']}\n\n"
+        f"⭐ {item['highlight']}"
+    ))
 
-    # 3) รายละเอียด
-    msgs.append(_text(f"📜 รายละเอียด\n{item['description']}"))
-
-    # 4) จุดเด่น
-    msgs.append(_text(f"⭐ จุดเด่น\n{item['highlight']}"))
-
-    # 5) สถานที่
+    # 3) สถานที่
     msgs.append(_text(f"📍 สถานที่\n{item['location']}"))
+
+    # 4) เครดิตภาพ (ถ้ามี)
+    if item.get("image_credit"):
+        msgs.append(_text(item["image_credit"]))
 
     _reply(api, event, msgs)
 

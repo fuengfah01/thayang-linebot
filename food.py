@@ -3,7 +3,7 @@ food = {
             "ผัดไทย 100 ปี": {
             "description": "ผัดไทยสูตรดั้งเดิม เส้นเหนียวนุ่ม",
             "highlight": "ร้านเก่าแก่ รสชาติเป็นเอกลักษณ์",
-            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/padthai1.png",
+            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/padthaifood.png",
             "location": "ร้านผัดไทย 100 ปี | https://maps.google.com/?q=ผัดไทย+100+ปี+ท่ายาง"
         },
         "ข้าวแช่แม่เล็ก": {
@@ -15,7 +15,8 @@ food = {
         "ก๋วยเตี๋ยวเรือ": {
             "description": "ก๋วยเตี๋ยวเรือน้ำซุปเข้มข้น หอมเครื่องเทศ",
             "highlight": "รสจัดจ้าน น้ำซุปกลมกล่อม",
-            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/boat_noodle1.jpg",
+            "image": "https://raw.githubusercontent.com/fuengfah01/thayang-linebot/main/image/noodle.jpg",
+            "image_credit": "📷 ภาพโดย: อยู่เพชร : U-Petch\nร้านก๋วยเตี๋ยวเรือ ชลประทานราษฎร์ ท่ายาง",
             "location": "ร้านก๋วยเตี๋ยวเรือ | https://maps.google.com/?q=ก๋วยเตี๋ยวเรือ+ท่ายาง"
         },
         "ข้าวหมูแดง หมูกรอบ": {
