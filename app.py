@@ -13,6 +13,7 @@ from db import search_place, get_places_by_category, get_all_place_names
 from info import info
 from food import food
 from ai_helper import ask_ai
+from dialogflow_helper import detect_intent
 
 import random
 import os
@@ -178,7 +179,6 @@ def dialogflow_webhook():
     parameters = data["queryResult"].get("parameters", {})
     place_name = parameters.get("place-name", "")
 
-    # แนะนำที่เที่ยว
     if intent in ["recommend_place", "place.travel"]:
         rows = get_places_by_category("travel")
         if rows:
@@ -188,7 +188,6 @@ def dialogflow_webhook():
         else:
             msg = "ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ"
 
-    # แนะนำร้านอาหาร
     elif intent == "place.eat":
         rows = get_places_by_category("eat")
         if rows:
@@ -198,7 +197,6 @@ def dialogflow_webhook():
         else:
             msg = "ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ"
 
-    # ค้นหาสถานที่
     elif intent == "place.search":
         p = search_place(place_name)
         if p:
@@ -209,7 +207,6 @@ def dialogflow_webhook():
         else:
             msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
 
-    # เช็คเวลาเปิด-ปิด
     elif intent == "place.opentime":
         p = search_place(place_name)
         if p and p.get("open_time") and p.get("close_time"):
@@ -555,24 +552,65 @@ def handle_message(event):
         elif text == "ไม่ใช่":
             _reply(api, event, [_text("ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ 😊")])
 
+        # ─── ส่งให้ Dialogflow แปล Intent ────────────────────────────────
         else:
-            p = search_place(text)
-            if p:
-                send_place_detail(api, event, text)
-            else:
-                all_names = get_all_place_names()
-                result = process.extractOne(text, all_names) if all_names else None
-                if result and result[1] > 60:
-                    match = result[0]
-                    _reply(api, event, [
-                        TextMessage(
-                            text=f"คุณหมายถึง {match} ใช่ไหมคะ?",
-                            quick_reply=QuickReply(items=[
-                                QuickReplyItem(action=MessageAction(label="✅ ใช่", text=f"ใช่_{match}")),
-                                QuickReplyItem(action=MessageAction(label="❌ ไม่ใช่", text="ไม่ใช่")),
-                            ])
-                        )
-                    ])
+            try:
+                result = detect_intent(text, session_id=event.source.user_id)
+                intent = result["intent"]
+                params = result["parameters"]
+                place_name = str(params.get("place-name", "")).strip()
+                confidence = result["confidence"]
+
+                if confidence > 0.5:
+                    if intent == "recommend_place":
+                        send_places(api, event)
+
+                    elif intent == "place.eat":
+                        rows = get_places_by_category("eat")
+                        if rows:
+                            msg = "🍽️ ร้านอาหารในท่ายาง\n\n"
+                            for i, r in enumerate(rows, 1):
+                                msg += f"{i}. {r['place_name']}\n"
+                            _reply(api, event, [_text(msg)])
+                        else:
+                            _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
+
+                    elif intent == "place.search" and place_name:
+                        p = search_place(place_name)
+                        if p:
+                            send_place_detail(api, event, place_name)
+                        else:
+                            _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+
+                    elif intent == "place.opentime" and place_name:
+                        p = search_place(place_name)
+                        if p and p.get("open_time") and p.get("close_time"):
+                            _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
+                        elif p:
+                            _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+                        else:
+                            _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+
+                    else:
+                        p = search_place(text)
+                        if p:
+                            send_place_detail(api, event, text)
+                        else:
+                            ai_answer = ask_ai(text)
+                            _reply(api, event, [_text(ai_answer)])
+                else:
+                    p = search_place(text)
+                    if p:
+                        send_place_detail(api, event, text)
+                    else:
+                        ai_answer = ask_ai(text)
+                        _reply(api, event, [_text(ai_answer)])
+
+            except Exception as e:
+                print("Dialogflow error:", e)
+                p = search_place(text)
+                if p:
+                    send_place_detail(api, event, text)
                 else:
                     ai_answer = ask_ai(text)
                     _reply(api, event, [_text(ai_answer)])
@@ -582,5 +620,5 @@ def handle_message(event):
 # 🚀 RUN
 # =========================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
