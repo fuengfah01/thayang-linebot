@@ -555,47 +555,99 @@ def send_food_detail(api, event, category, name):
 
 
 # =========================
-# 🕐 ส่ง quick reply เวลาเปิด-ปิด (สถานที่ทั้งหมด)
+# 🕐 ฟังก์ชันตอบเวลาตาม mode: "open" | "close" | "both"
 # =========================
-def send_opentime_place_picker(api, event):
-    all_names = get_all_place_names()
-    quick_items = [
-        QuickReplyItem(
-            action=MessageAction(
-                label=n[:20],
-                text=f"เวลาเปิดปิดของ{n}"
-            )
-        )
-        for n in all_names[:13]
-    ]
-    _reply(api, event, [
-        TextMessage(
-            text="ต้องการทราบข้อมูลเวลาเปิด-ปิดของที่ไหนคะ? 🕐\nกดเลือกได้เลยค่ะ",
-            quick_reply=QuickReply(items=quick_items)
-        )
-    ])
-
-
-# =========================
-# 🍽 ส่ง quick reply เวลาปิด — เฉพาะร้านอาหาร (category=eat)
-# =========================
-def send_closetime_eat_picker(api, event):
-    rows = get_places_by_category("eat")
-    if not rows:
-        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
+def _reply_time_by_mode(api, event, p: dict, mode: str):
+    """ตอบเวลาตาม mode ที่ผู้ใช้ถาม"""
+    name = p["place_name"]
+    ot = p.get("open_time")
+    ct = p.get("close_time")
+    if not ot or not ct:
+        _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {name} ค่ะ")])
         return
+    if mode == "open":
+        _reply(api, event, [_text(f"🕐 {name} เปิด {ot} น.ค่ะ")])
+    elif mode == "close":
+        _reply(api, event, [_text(f"🕐 {name} ปิด {ct} น.ค่ะ")])
+    else:  # both
+        _reply(api, event, [_text(f"🕐 {name} เปิด {ot} - {ct} น.ค่ะ")])
+
+
+def _detect_time_mode(text: str) -> str:
+    """
+    ตรวจว่าผู้ใช้ถามเรื่องอะไร
+    คืนค่า: 'open' | 'close' | 'both'
+    """
+    has_open  = any(kw in text for kw in ["เปิดกี่โมง", "เปิดไหม", "เปิดยัง", "เปิดกี่",
+                                           "เปิดเวลา", "เปิดตอน", "เปิดได้", "ยังเปิด",
+                                           "เปิดอยู่", "เปิดบ้าง"])
+    has_close = any(kw in text for kw in ["ปิดกี่โมง", "ปิดไหม", "ปิดยัง", "ปิดกี่",
+                                           "ปิดเวลา", "ปิดตอน", "ร้านปิด", "ปิดแล้วยัง",
+                                           "ปิดอยู่", "ร้านยังปิด"])
+    has_both  = any(kw in text for kw in ["เวลาเปิดปิด", "เปิดปิด", "เวลาทำการ",
+                                           "เปิดกี่โมงปิดกี่โมง"])
+    if has_both:
+        return "both"
+    if has_open and has_close:
+        return "both"
+    if has_open:
+        return "open"
+    if has_close:
+        return "close"
+    return "both"   # default
+
+
+def _detect_category_from_text(text: str) -> str:
+    """
+    ตรวจว่าควรแสดงสถานที่ category ไหน
+    - มีคำว่า 'ร้าน' นำหน้า → eat (ร้านอาหารเท่านั้น)
+    - คำถามทั่วไป เช่น 'ปิดยัง' → all (ทุกสถานที่)
+    คืนค่า: 'eat' | 'all'
+    """
+    if any(kw in text for kw in ["ร้านปิด", "ร้านยังปิด", "ร้านเปิด", "ร้านยังเปิด",
+                                   "ร้านอาหารปิด", "ร้านอาหารเปิด"]):
+        return "eat"
+    return "all"
+
+
+# =========================
+# 🕐 ส่ง quick reply ถามสถานที่ (แยกตาม mode และ category)
+# =========================
+def send_time_picker(api, event, mode: str, category: str = "all"):
+    """
+    mode     = 'open' | 'close' | 'both'
+    category = 'all' | 'eat' | 'travel'
+    """
+    if category == "eat":
+        rows = get_places_by_category("eat")
+        names = [r["place_name"] for r in rows] if rows else []
+    elif category == "travel":
+        rows = get_places_by_category("travel")
+        names = [r["place_name"] for r in rows] if rows else []
+    else:
+        names = get_all_place_names()
+
+    if not names:
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
+        return
+
+    # label ปุ่ม quick reply ส่ง prefix ตาม mode เพื่อให้ handler รู้ว่าถามอะไร
+    prefix_map = {"open": "เวลาเปิดของ", "close": "เวลาปิดของ", "both": "เวลาเปิดปิดของ"}
+    prefix = prefix_map[mode]
+
+    question_map = {
+        "open":  "ต้องการทราบเวลาเปิดของที่ไหนคะ? 🕐",
+        "close": "ต้องการทราบเวลาปิดของที่ไหนคะ? 🕐",
+        "both":  "ต้องการทราบเวลาเปิด-ปิดของที่ไหนคะ? 🕐",
+    }
+
     quick_items = [
-        QuickReplyItem(
-            action=MessageAction(
-                label=r["place_name"][:20],
-                text=f"เวลาเปิดปิดของ{r['place_name']}"
-            )
-        )
-        for r in rows[:13]
+        QuickReplyItem(action=MessageAction(label=n[:20], text=f"{prefix}{n}"))
+        for n in names[:13]
     ]
     _reply(api, event, [
         TextMessage(
-            text="ต้องการทราบข้อมูลเวลาปิดของร้านไหนคะ? 🍽️\nกดเลือกได้เลยค่ะ",
+            text=question_map[mode] + "\nกดเลือกได้เลยค่ะ",
             quick_reply=QuickReply(items=quick_items)
         )
     ])
@@ -701,14 +753,20 @@ def handle_message(event):
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
 
-        # ---- รับคำตอบจาก quick reply เวลาเปิด-ปิด ----
-        elif text.startswith("เวลาเปิดปิดของ"):
-            place_name = text.replace("เวลาเปิดปิดของ", "", 1).strip()
+        # ---- รับคำตอบจาก quick reply เวลา (3 mode) ----
+        elif text.startswith("เวลาเปิดของ") or text.startswith("เวลาปิดของ") or text.startswith("เวลาเปิดปิดของ"):
+            if text.startswith("เวลาเปิดปิดของ"):
+                mode = "both"
+                place_name = text.replace("เวลาเปิดปิดของ", "", 1).strip()
+            elif text.startswith("เวลาเปิดของ"):
+                mode = "open"
+                place_name = text.replace("เวลาเปิดของ", "", 1).strip()
+            else:
+                mode = "close"
+                place_name = text.replace("เวลาปิดของ", "", 1).strip()
             p = search_place(place_name)
-            if p and p.get("open_time") and p.get("close_time"):
-                _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
-            elif p:
-                _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+            if p:
+                _reply_time_by_mode(api, event, p, mode)
             else:
                 _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
 
@@ -725,11 +783,15 @@ def handle_message(event):
         elif text == "ไม่ใช่":
             _reply(api, event, [_text("ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ 😊")])
 
-        # ---- ตรวจจับคำถามเรื่องเวลา "ปิด" โดยไม่ระบุร้าน → แสดงเฉพาะร้านอาหาร ----
-        elif any(kw in text for kw in ["ปิดกี่โมง", "ปิดไหม", "ปิดยัง", "ปิดกี่", "ปิดเวลา",
-                                        "ร้านปิด", "ร้านยังปิด", "ปิดแล้วยัง"]) and \
-             not text.startswith("เวลาเปิดปิดของ"):
-            # เช็คว่ามีชื่อสถานที่ระบุมาในข้อความหรือเปล่า
+        # ---- ตรวจจับคำถามเรื่องเวลาเปิด/ปิด/เปิดปิด ----
+        elif any(kw in text for kw in [
+            "เปิดกี่โมง", "เปิดไหม", "เปิดยัง", "เปิดกี่", "เปิดเวลา", "เปิดตอน",
+            "ยังเปิด", "เปิดอยู่", "ปิดกี่โมง", "ปิดไหม", "ปิดยัง", "ปิดกี่",
+            "ปิดเวลา", "ปิดตอน", "ร้านปิด", "ปิดแล้วยัง", "ปิดอยู่", "ร้านยังปิด",
+            "เวลาเปิดปิด", "เปิดปิด", "เวลาทำการ"
+        ]):
+            mode = _detect_time_mode(text)
+            # เช็คว่ามีชื่อสถานที่ในข้อความหรือเปล่า
             matched_place = None
             for n in get_all_place_names():
                 if n in text:
@@ -737,14 +799,14 @@ def handle_message(event):
                     break
             if matched_place:
                 p = search_place(matched_place)
-                if p and p.get("open_time") and p.get("close_time"):
-                    _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
-                elif p:
-                    _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+                if p:
+                    _reply_time_by_mode(api, event, p, mode)
                 else:
                     _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {matched_place} ค่ะ")])
             else:
-                send_closetime_eat_picker(api, event)
+                # มีคำว่า "ร้าน" นำหน้า → แสดงเฉพาะร้านอาหาร, อื่นๆ → ทุกสถานที่
+                cat = _detect_category_from_text(text)
+                send_time_picker(api, event, mode, cat)
 
         # ─── ส่งให้ Dialogflow แปล Intent ────────────────────────────────
         else:
@@ -790,20 +852,16 @@ def handle_message(event):
                             _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
 
                     elif intent == "place.opentime":
-                        # ถ้ามีชื่อสถานที่ → ตอบทันที
+                        mode = _detect_time_mode(text)
                         if place_name:
                             p = search_place(place_name)
-                            if p and p.get("open_time") and p.get("close_time"):
-                                _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
-                            elif p:
-                                _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+                            if p:
+                                _reply_time_by_mode(api, event, p, mode)
                             else:
                                 _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
-                        # ไม่มีชื่อสถานที่ → แยกตามว่าถามเรื่อง "ปิด" หรือ "เปิด"
-                        elif any(kw in text for kw in ["ปิด"]):
-                            send_closetime_eat_picker(api, event)
                         else:
-                            send_opentime_place_picker(api, event)
+                            cat = _detect_category_from_text(text)
+                            send_time_picker(api, event, mode, cat)
 
                     else:
                         p = search_place(text)
