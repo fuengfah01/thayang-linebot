@@ -17,6 +17,7 @@ from dialogflow_helper import detect_intent
 
 import random
 import os
+import requests as req
 
 app = Flask(__name__)
 
@@ -140,7 +141,7 @@ def _image(url: str) -> ImageMessage:
 
 
 # =========================
-# 🖼 ROUTE
+# 🖼 ROUTE — รูปภาพ
 # =========================
 @app.route('/image/<path:filename>')
 def serve_image(filename):
@@ -153,6 +154,94 @@ def serve_image(filename):
 @app.route("/")
 def home():
     return "LINE BOT RUNNING"
+
+
+# =========================
+# 🎛 SETUP RICH MENU
+# =========================
+@app.route("/setup-richmenu")
+def setup_richmenu():
+    headers_json = {
+        "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    headers_auth = {
+        "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"
+    }
+
+    # 1. ลบ Rich Menu เก่าทั้งหมดก่อน
+    res_list = req.get("https://api.line.me/v2/bot/richmenu/list", headers=headers_auth)
+    for menu in res_list.json().get("richmenus", []):
+        req.delete(f"https://api.line.me/v2/bot/richmenu/{menu['richMenuId']}", headers=headers_auth)
+
+    # 2. สร้าง Rich Menu ใหม่ (6 ปุ่ม 2 แถว x 3 คอลัมน์)
+    body = {
+        "size": {"width": 2500, "height": 1686},
+        "selected": True,
+        "name": "Main Menu",
+        "chatBarText": "ผู้ช่วยเที่ยวท่ายาง",
+        "areas": [
+            # แถวบน
+            {
+                "bounds": {"x": 0,    "y": 0, "w": 833, "h": 843},
+                "action": {"type": "message", "text": "สถานที่ท่องเที่ยว"}
+            },
+            {
+                "bounds": {"x": 833,  "y": 0, "w": 834, "h": 843},
+                "action": {"type": "message", "text": "ร้านอาหาร"}
+            },
+            {
+                "bounds": {"x": 1667, "y": 0, "w": 833, "h": 843},
+                "action": {"type": "message", "text": "กิจกรรมภายในอำเภอท่ายาง"}
+            },
+            # แถวล่าง
+            {
+                "bounds": {"x": 0,    "y": 843, "w": 833, "h": 843},
+                "action": {"type": "message", "text": "แผนที่ภายในอำเภอท่ายาง"}
+            },
+            {
+                "bounds": {"x": 833,  "y": 843, "w": 834, "h": 843},
+                "action": {"type": "message", "text": "ของฝาก"}
+            },
+            {
+                "bounds": {"x": 1667, "y": 843, "w": 833, "h": 843},
+                "action": {"type": "message", "text": "เกี่ยวกับเรา"}
+            },
+        ]
+    }
+
+    res = req.post(
+        "https://api.line.me/v2/bot/richmenu",
+        headers=headers_json,
+        json=body
+    )
+    rich_menu_id = res.json().get("richMenuId")
+
+    if not rich_menu_id:
+        return f"❌ สร้าง Rich Menu ไม่สำเร็จ: {res.json()}", 500
+
+    # 3. อัพโหลดรูป (วางไฟล์ richmenu.jpg ไว้ใน folder เดียวกับ app.py)
+    img_path = os.path.join(os.path.dirname(__file__), "richmenu.jpg")
+    if os.path.exists(img_path):
+        with open(img_path, "rb") as f:
+            req.post(
+                f"https://api-data.line.me/v2/bot/richmenu/{rich_menu_id}/content",
+                headers={
+                    "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}",
+                    "Content-Type": "image/jpeg"
+                },
+                data=f.read()
+            )
+    else:
+        return f"⚠️ สร้าง Rich Menu ID: {rich_menu_id} สำเร็จ แต่ไม่พบไฟล์ richmenu.jpg กรุณาอัพโหลดรูปด้วยค่ะ", 200
+
+    # 4. ตั้งเป็น Default Rich Menu
+    req.post(
+        f"https://api.line.me/v2/bot/richmenu/default/{rich_menu_id}",
+        headers=headers_auth
+    )
+
+    return f"✅ Rich Menu สร้างสำเร็จ! ID: {rich_menu_id}"
 
 
 # =========================
