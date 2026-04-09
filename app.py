@@ -696,8 +696,15 @@ def handle_message(event):
                             _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
 
                     elif intent == "place.search" and place_name:
+                        # ดึงจาก DB ก่อน
                         p = search_place(place_name)
                         if p:
+                            msg = f"📍 {p['place_name']}\n\n📖 {p['place_description']}"
+                            if p.get("open_time") and p.get("close_time"):
+                                msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
+                            _reply(api, event, [_text(msg)])
+                        elif place_name in places:
+                            # fallback ดึงจาก places.py
                             send_place_detail(api, event, place_name)
                         else:
                             _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
