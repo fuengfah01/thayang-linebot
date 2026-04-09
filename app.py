@@ -316,33 +316,51 @@ def dialogflow_webhook():
 # 📍 สถานที่ — ดึงจาก DB
 # =========================
 def send_place_detail(api, event, name):
+    # ดึงจาก places.py ก่อน ถ้าไม่เจอค่อยดึงจาก DB
+    if name in places:
+        p = places[name]
+        msgs = []
+        if p.get("images"):
+            msgs.append(_image(p["images"][0]))
+        msgs.append(_text(f"📍 {name}\n\n📖 {p.get('history', '')}"))
+        detail = f"⭐ จุดเด่น\n{p.get('highlight', '')}"
+        if p.get("time"):
+            detail += f"\n\n🕐 เวลา {p['time']} น."
+        if p.get("map"):
+            detail += f"\n\n🗺 {p['map']}"
+        msgs.append(_text(detail))
+        _reply(api, event, msgs)
+        return
+
+    # fallback: ดึงจาก DB
     p = search_place(name)
     if not p:
         _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {name} ค่ะ")])
         return
-
     cat = "🏛️ สถานที่ท่องเที่ยว" if p["category"] == "travel" else "🍽️ ร้านอาหาร"
     msg = f"{cat}\n\n📍 {p['place_name']}\n\n📖 {p['place_description']}"
     if p.get("open_time") and p.get("close_time"):
         msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
     else:
         msg += "\n\n🕐 ยังไม่มีข้อมูลเวลาเปิด-ปิดค่ะ"
-
     _reply(api, event, [_text(msg)])
 
 
 def send_places(api, event):
-    rows = get_places_by_category("travel")
-    if not rows:
+    # ดึงจาก places.py โดยตรง กรองเฉพาะ type=place และไม่เอาแผนที่
+    travel_names = [
+        name for name, data in places.items()
+        if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+    ][:9]
+    if not travel_names:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
-    names = [r["place_name"] for r in rows[:9]]
     _reply(api, event, [
         TextMessage(
             text="📍 เลือกสถานที่ท่องเที่ยวในท่ายางค่ะ",
             quick_reply=QuickReply(items=[
                 QuickReplyItem(action=MessageAction(label=name, text=name))
-                for name in names
+                for name in travel_names
             ])
         )
     ])
@@ -593,6 +611,9 @@ def handle_message(event):
 
         elif text in ["travel", "สถานที่ท่องเที่ยว"]:
             send_places(api, event)
+
+        elif text in places and text != "แผนที่อำเภอท่ายาง":
+            send_place_detail(api, event, text)
 
         elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
