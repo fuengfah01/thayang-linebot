@@ -1,6 +1,6 @@
 flask
 gunicorn
-line-bot-sdk>=3.23.0
+line-bot-sdk
 rapidfuzz
 mysql-connector-python
 google-cloud-dialogflow
