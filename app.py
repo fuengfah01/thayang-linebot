@@ -298,13 +298,17 @@ def dialogflow_webhook():
             msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
 
     elif intent == "place.opentime":
-        p = search_place(place_name)
-        if p and p.get("open_time") and p.get("close_time"):
-            msg = f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ"
-        elif p:
-            msg = f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ"
+        # ---- แก้ไข: ถ้าไม่ระบุสถานที่ ให้ถามกลับพร้อม quick reply ----
+        if not place_name:
+            msg = "ต้องการทราบข้อมูลเวลาเปิด-ปิดของที่ไหนคะ? 🕐"
         else:
-            msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
+            p = search_place(place_name)
+            if p and p.get("open_time") and p.get("close_time"):
+                msg = f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ"
+            elif p:
+                msg = f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ"
+            else:
+                msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
 
     else:
         msg = "ขอโทษค่ะ ไม่เข้าใจคำถาม ลองถามใหม่ได้เลยค่ะ 😊"
@@ -551,6 +555,28 @@ def send_food_detail(api, event, category, name):
 
 
 # =========================
+# 🕐 ส่ง quick reply รายชื่อสถานที่ทั้งหมด (ใช้เมื่อถามเวลาแต่ไม่ระบุสถานที่)
+# =========================
+def send_opentime_place_picker(api, event):
+    all_names = get_all_place_names()
+    quick_items = [
+        QuickReplyItem(
+            action=MessageAction(
+                label=n[:20],
+                text=f"เวลาเปิดปิดของ{n}"
+            )
+        )
+        for n in all_names[:13]
+    ]
+    _reply(api, event, [
+        TextMessage(
+            text="ต้องการทราบข้อมูลเวลาเปิด-ปิดของที่ไหนคะ? 🕐\nกดเลือกได้เลยค่ะ",
+            quick_reply=QuickReply(items=quick_items)
+        )
+    ])
+
+
+# =========================
 # 📩 HANDLE MESSAGE
 # =========================
 @handler.add(MessageEvent, message=TextMessageContent)
@@ -650,6 +676,17 @@ def handle_message(event):
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
 
+        # ---- รับคำตอบจาก quick reply เวลาเปิด-ปิด ----
+        elif text.startswith("เวลาเปิดปิดของ"):
+            place_name = text.replace("เวลาเปิดปิดของ", "", 1).strip()
+            p = search_place(place_name)
+            if p and p.get("open_time") and p.get("close_time"):
+                _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
+            elif p:
+                _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+            else:
+                _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+
         elif text.startswith("ใช่_"):
             name = text.replace("ใช่_", "", 1)
             p = search_place(name)
@@ -674,7 +711,6 @@ def handle_message(event):
 
                 if confidence > 0.5:
                     if intent == "recommend_place":
-                        # ตอบเป็นข้อความแนะนำสถานที่เลย ไม่มีปุ่ม
                         travel_names = [
                             name for name, data in places.items()
                             if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
@@ -696,7 +732,6 @@ def handle_message(event):
                             _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
 
                     elif intent == "place.search" and place_name:
-                        # ดึงจาก DB ก่อน
                         p = search_place(place_name)
                         if p:
                             msg = f"📍 {p['place_name']}\n\n📖 {p['place_description']}"
@@ -704,19 +739,22 @@ def handle_message(event):
                                 msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
                             _reply(api, event, [_text(msg)])
                         elif place_name in places:
-                            # fallback ดึงจาก places.py
                             send_place_detail(api, event, place_name)
                         else:
                             _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
 
-                    elif intent == "place.opentime" and place_name:
-                        p = search_place(place_name)
-                        if p and p.get("open_time") and p.get("close_time"):
-                            _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
-                        elif p:
-                            _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+                    elif intent == "place.opentime":
+                        # ---- แก้ไขหลัก: ถ้าไม่มี place_name → ถามกลับพร้อม quick reply ----
+                        if not place_name:
+                            send_opentime_place_picker(api, event)
                         else:
-                            _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+                            p = search_place(place_name)
+                            if p and p.get("open_time") and p.get("close_time"):
+                                _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
+                            elif p:
+                                _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+                            else:
+                                _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
 
                     else:
                         p = search_place(text)
