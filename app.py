@@ -808,6 +808,54 @@ def handle_message(event):
                 cat = _detect_category_from_text(text)
                 send_time_picker(api, event, mode, cat)
 
+        # ---- แนะนำที่เที่ยว / แนะนำที่กิน → ตอบแบบ list เดิม ----
+        elif any(kw in text for kw in [
+            "แนะนำที่เที่ยว", "ที่เที่ยวแนะนำ", "ที่เที่ยวดีๆ", "มีที่เที่ยวอะไรบ้าง",
+            "แนะนำสถานที่", "สถานที่แนะนำ", "สถานที่น่าเที่ยว",
+        ]):
+            travel_names = [
+                name for name, data in places.items()
+                if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+            ]
+            msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
+            for i, name in enumerate(travel_names, 1):
+                p = places[name]
+                msg += f"{i}. {name}\n   ⭐ {p.get('highlight', '')}\n\n"
+            _reply(api, event, [_text(msg.strip())])
+
+        elif any(kw in text for kw in [
+            "แนะนำที่กิน", "แนะนำร้านอาหาร", "ร้านอาหารแนะนำ", "มีร้านอาหารอะไรบ้าง",
+            "กินอะไรดี", "ร้านไหนอร่อย", "ร้านแนะนำ",
+        ]):
+            rows = get_places_by_category("eat")
+            if rows:
+                msg = "🍽️ ร้านอาหารแนะนำในท่ายางค่ะ\n\n"
+                for i, r in enumerate(rows, 1):
+                    msg += f"{i}. {r['place_name']}\n"
+                _reply(api, event, [_text(msg)])
+            else:
+                _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
+
+        # ---- ไปไหนดี / อยากเที่ยว → ถามกลับด้วย quick reply กิจกรรม ----
+        elif any(kw in text for kw in [
+            "ไปไหนดี", "อยากเที่ยว", "เที่ยวไหนดี", "อยากไปเที่ยว",
+            "เที่ยวอะไรดี", "จะไปไหน", "ไปเที่ยวอะไรดี", "อยากไป",
+            "น่าเที่ยว", "ไปเที่ยวที่ไหน", "เที่ยวที่ไหนดี",
+        ]):
+            _reply(api, event, [
+                _text("น้องเพชรมีกิจกรรมแนะนำในท่ายางเลยค่ะ 🗺️"),
+                TextMessage(
+                    text="อยากทำอะไรคะ? กดเลือกได้เลยนะคะ 👇",
+                    quick_reply=QuickReply(items=[
+                        QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระทำบุญ",     text="ไหว้พระในท่ายาง")),
+                        QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูปเช็คอิน",   text="ถ่ายรูปในท่ายาง")),
+                        QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา",      text="ให้อาหารปลาในท่ายาง")),
+                        QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน",         text="ตะลอนกินในท่ายาง")),
+                        QuickReplyItem(action=MessageAction(label="🏛️ ดูสถานที่ทั้งหมด", text="สถานที่ท่องเที่ยว")),
+                    ])
+                )
+            ])
+
         # ─── ส่งให้ Dialogflow แปล Intent ────────────────────────────────
         else:
             try:
@@ -819,15 +867,35 @@ def handle_message(event):
 
                 if confidence > 0.5:
                     if intent == "recommend_place":
-                        travel_names = [
-                            name for name, data in places.items()
-                            if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
-                        ]
-                        msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
-                        for i, name in enumerate(travel_names, 1):
-                            p = places[name]
-                            msg += f"{i}. {name}\n   ⭐ {p.get('highlight', '')}\n\n"
-                        _reply(api, event, [_text(msg.strip())])
+                        # ถ้า text มี keyword "แนะนำ/มีอะไรบ้าง" → list เดิม
+                        # ถ้า text มี keyword "ไปไหนดี/อยากเที่ยว" → quick reply กิจกรรม
+                        if any(kw in text for kw in [
+                            "แนะนำที่เที่ยว", "ที่เที่ยวแนะนำ", "สถานที่แนะนำ",
+                            "มีที่เที่ยวอะไรบ้าง", "สถานที่น่าเที่ยว", "แนะนำสถานที่",
+                        ]):
+                            travel_names = [
+                                name for name, data in places.items()
+                                if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+                            ]
+                            msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
+                            for i, name in enumerate(travel_names, 1):
+                                p = places[name]
+                                msg += f"{i}. {name}\n   ⭐ {p.get('highlight', '')}\n\n"
+                            _reply(api, event, [_text(msg.strip())])
+                        else:
+                            _reply(api, event, [
+                                _text("น้องเพชรมีกิจกรรมแนะนำในท่ายางเลยค่ะ 🗺️"),
+                                TextMessage(
+                                    text="อยากทำอะไรคะ? กดเลือกได้เลยนะคะ 👇",
+                                    quick_reply=QuickReply(items=[
+                                        QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระทำบุญ",     text="ไหว้พระในท่ายาง")),
+                                        QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูปเช็คอิน",   text="ถ่ายรูปในท่ายาง")),
+                                        QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา",      text="ให้อาหารปลาในท่ายาง")),
+                                        QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน",         text="ตะลอนกินในท่ายาง")),
+                                        QuickReplyItem(action=MessageAction(label="🏛️ ดูสถานที่ทั้งหมด", text="สถานที่ท่องเที่ยว")),
+                                    ])
+                                )
+                            ])
 
                     elif intent == "place.eat":
                         rows = get_places_by_category("eat")
