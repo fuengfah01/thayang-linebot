@@ -555,7 +555,7 @@ def send_food_detail(api, event, category, name):
 
 
 # =========================
-# 🕐 ส่ง quick reply รายชื่อสถานที่ทั้งหมด (ใช้เมื่อถามเวลาแต่ไม่ระบุสถานที่)
+# 🕐 ส่ง quick reply เวลาเปิด-ปิด (สถานที่ทั้งหมด)
 # =========================
 def send_opentime_place_picker(api, event):
     all_names = get_all_place_names()
@@ -571,6 +571,31 @@ def send_opentime_place_picker(api, event):
     _reply(api, event, [
         TextMessage(
             text="ต้องการทราบข้อมูลเวลาเปิด-ปิดของที่ไหนคะ? 🕐\nกดเลือกได้เลยค่ะ",
+            quick_reply=QuickReply(items=quick_items)
+        )
+    ])
+
+
+# =========================
+# 🍽 ส่ง quick reply เวลาปิด — เฉพาะร้านอาหาร (category=eat)
+# =========================
+def send_closetime_eat_picker(api, event):
+    rows = get_places_by_category("eat")
+    if not rows:
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
+        return
+    quick_items = [
+        QuickReplyItem(
+            action=MessageAction(
+                label=r["place_name"][:20],
+                text=f"เวลาเปิดปิดของ{r['place_name']}"
+            )
+        )
+        for r in rows[:13]
+    ]
+    _reply(api, event, [
+        TextMessage(
+            text="ต้องการทราบข้อมูลเวลาปิดของร้านไหนคะ? 🍽️\nกดเลือกได้เลยค่ะ",
             quick_reply=QuickReply(items=quick_items)
         )
     ])
@@ -700,6 +725,27 @@ def handle_message(event):
         elif text == "ไม่ใช่":
             _reply(api, event, [_text("ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ 😊")])
 
+        # ---- ตรวจจับคำถามเรื่องเวลา "ปิด" โดยไม่ระบุร้าน → แสดงเฉพาะร้านอาหาร ----
+        elif any(kw in text for kw in ["ปิดกี่โมง", "ปิดไหม", "ปิดยัง", "ปิดกี่", "ปิดเวลา",
+                                        "ร้านปิด", "ร้านยังปิด", "ปิดแล้วยัง"]) and \
+             not text.startswith("เวลาเปิดปิดของ"):
+            # เช็คว่ามีชื่อสถานที่ระบุมาในข้อความหรือเปล่า
+            matched_place = None
+            for n in get_all_place_names():
+                if n in text:
+                    matched_place = n
+                    break
+            if matched_place:
+                p = search_place(matched_place)
+                if p and p.get("open_time") and p.get("close_time"):
+                    _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
+                elif p:
+                    _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
+                else:
+                    _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {matched_place} ค่ะ")])
+            else:
+                send_closetime_eat_picker(api, event)
+
         # ─── ส่งให้ Dialogflow แปล Intent ────────────────────────────────
         else:
             try:
@@ -744,10 +790,8 @@ def handle_message(event):
                             _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
 
                     elif intent == "place.opentime":
-                        # ---- แก้ไขหลัก: ถ้าไม่มี place_name → ถามกลับพร้อม quick reply ----
-                        if not place_name:
-                            send_opentime_place_picker(api, event)
-                        else:
+                        # ถ้ามีชื่อสถานที่ → ตอบทันที
+                        if place_name:
                             p = search_place(place_name)
                             if p and p.get("open_time") and p.get("close_time"):
                                 _reply(api, event, [_text(f"🕐 {p['place_name']} เปิด {p['open_time']} - {p['close_time']} น.ค่ะ")])
@@ -755,6 +799,11 @@ def handle_message(event):
                                 _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {p['place_name']} ค่ะ")])
                             else:
                                 _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+                        # ไม่มีชื่อสถานที่ → แยกตามว่าถามเรื่อง "ปิด" หรือ "เปิด"
+                        elif any(kw in text for kw in ["ปิด"]):
+                            send_closetime_eat_picker(api, event)
+                        else:
+                            send_opentime_place_picker(api, event)
 
                     else:
                         p = search_place(text)
