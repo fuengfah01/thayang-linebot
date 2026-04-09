@@ -183,28 +183,28 @@ def setup_richmenu():
         "areas": [
             # แถวบน
             {
-                "bounds": {"x": 0,    "y": 0, "w": 833, "h": 843},
+                "bounds": {"x": 0,    "y": 0, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "สถานที่ท่องเที่ยว"}
             },
             {
-                "bounds": {"x": 833,  "y": 0, "w": 834, "h": 843},
+                "bounds": {"x": 833,  "y": 0, "width": 834, "height": 843},
                 "action": {"type": "message", "text": "ร้านอาหาร"}
             },
             {
-                "bounds": {"x": 1667, "y": 0, "w": 833, "h": 843},
+                "bounds": {"x": 1667, "y": 0, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "กิจกรรมภายในอำเภอท่ายาง"}
             },
             # แถวล่าง
             {
-                "bounds": {"x": 0,    "y": 843, "w": 833, "h": 843},
+                "bounds": {"x": 0,    "y": 843, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "แผนที่ภายในอำเภอท่ายาง"}
             },
             {
-                "bounds": {"x": 833,  "y": 843, "w": 834, "h": 843},
+                "bounds": {"x": 833,  "y": 843, "width": 834, "height": 843},
                 "action": {"type": "message", "text": "ของฝาก"}
             },
             {
-                "bounds": {"x": 1667, "y": 843, "w": 833, "h": 843},
+                "bounds": {"x": 1667, "y": 843, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "เกี่ยวกับเรา"}
             },
         ]
