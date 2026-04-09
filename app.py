@@ -674,7 +674,16 @@ def handle_message(event):
 
                 if confidence > 0.5:
                     if intent == "recommend_place":
-                        send_places(api, event)
+                        # ตอบเป็นข้อความแนะนำสถานที่เลย ไม่มีปุ่ม
+                        travel_names = [
+                            name for name, data in places.items()
+                            if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+                        ]
+                        msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
+                        for i, name in enumerate(travel_names, 1):
+                            p = places[name]
+                            msg += f"{i}. {name}\n   ⭐ {p.get('highlight', '')}\n\n"
+                        _reply(api, event, [_text(msg.strip())])
 
                     elif intent == "place.eat":
                         rows = get_places_by_category("eat")
