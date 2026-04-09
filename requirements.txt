@@ -1,5 +1,5 @@
 flask
 gunicorn
-line-bot-sdk-python
-mysql-connector-python
+line-bot-sdk
 rapidfuzz
+mysql-connector-python
