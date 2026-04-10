@@ -170,16 +170,19 @@ def setup_richmenu():
         "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"
     }
 
+    # 1. ลบ Rich Menu เก่าทั้งหมดก่อน
     res_list = req.get("https://api.line.me/v2/bot/richmenu/list", headers=headers_auth)
     for menu in res_list.json().get("richmenus", []):
         req.delete(f"https://api.line.me/v2/bot/richmenu/{menu['richMenuId']}", headers=headers_auth)
 
+    # 2. สร้าง Rich Menu ใหม่ (6 ปุ่ม 2 แถว x 3 คอลัมน์)
     body = {
         "size": {"width": 2500, "height": 1686},
         "selected": True,
         "name": "Main Menu",
         "chatBarText": "ผู้ช่วยเที่ยวท่ายาง",
         "areas": [
+            # แถวบน
             {
                 "bounds": {"x": 0,    "y": 0, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "สถานที่ท่องเที่ยว"}
@@ -192,6 +195,7 @@ def setup_richmenu():
                 "bounds": {"x": 1667, "y": 0, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "กิจกรรมภายในอำเภอท่ายาง"}
             },
+            # แถวล่าง
             {
                 "bounds": {"x": 0,    "y": 843, "width": 833, "height": 843},
                 "action": {"type": "message", "text": "แผนที่ภายในอำเภอท่ายาง"}
@@ -217,6 +221,7 @@ def setup_richmenu():
     if not rich_menu_id:
         return f"❌ สร้าง Rich Menu ไม่สำเร็จ: {res.json()}", 500
 
+    # 3. อัพโหลดรูป (วางไฟล์ richmenu.jpg ไว้ใน folder เดียวกับ app.py)
     img_path = os.path.join(os.path.dirname(__file__), "richmenu.jpg")
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
@@ -231,6 +236,7 @@ def setup_richmenu():
     else:
         return f"⚠️ สร้าง Rich Menu ID: {rich_menu_id} สำเร็จ แต่ไม่พบไฟล์ richmenu.jpg กรุณาอัพโหลดรูปด้วยค่ะ", 200
 
+    # 4. ตั้งเป็น Default Rich Menu
     req.post(
         f"https://api.line.me/v2/bot/richmenu/default/{rich_menu_id}",
         headers=headers_auth
@@ -264,7 +270,6 @@ def dialogflow_webhook():
     place_name = parameters.get("place-name", "")
 
     if intent in ["recommend_place", "place.travel"]:
-        # ✅ ดึงจาก DB
         rows = get_places_by_category("travel")
         if rows:
             msg = "🏛️ สถานที่ท่องเที่ยวในท่ายาง\n\n"
@@ -293,6 +298,7 @@ def dialogflow_webhook():
             msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
 
     elif intent == "place.opentime":
+        # ---- แก้ไข: ถ้าไม่ระบุสถานที่ ให้ถามกลับพร้อม quick reply ----
         if not place_name:
             msg = "ต้องการทราบข้อมูลเวลาเปิด-ปิดของที่ไหนคะ? 🕐"
         else:
@@ -311,7 +317,7 @@ def dialogflow_webhook():
 
 
 # =========================
-# 📍 สถานที่ — ดึงจาก DB เป็นหลัก
+# 📍 สถานที่ — ดึงจาก DB
 # =========================
 def send_place_detail(api, event, name):
     # ดึงจาก places.py ก่อน ถ้าไม่เจอค่อยดึงจาก DB
@@ -345,17 +351,19 @@ def send_place_detail(api, event, name):
 
 
 def send_places(api, event):
-    # ✅ ดึงจาก DB แทน places.py
-    rows = get_places_by_category("travel")
-    if not rows:
+    # ดึงจาก places.py โดยตรง กรองเฉพาะ type=place และไม่เอาแผนที่
+    travel_names = [
+        name for name, data in places.items()
+        if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+    ][:9]
+    if not travel_names:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
-    travel_names = [r["place_name"] for r in rows][:9]
     _reply(api, event, [
         TextMessage(
             text="📍 เลือกสถานที่ท่องเที่ยวในท่ายางค่ะ",
             quick_reply=QuickReply(items=[
-                QuickReplyItem(action=MessageAction(label=name[:20], text=name))
+                QuickReplyItem(action=MessageAction(label=name, text=name))
                 for name in travel_names
             ])
         )
@@ -547,9 +555,10 @@ def send_food_detail(api, event, category, name):
 
 
 # =========================
-# 🕐 ฟังก์ชันตอบเวลาตาม mode
+# 🕐 ฟังก์ชันตอบเวลาตาม mode: "open" | "close" | "both"
 # =========================
 def _reply_time_by_mode(api, event, p: dict, mode: str):
+    """ตอบเวลาตาม mode ที่ผู้ใช้ถาม"""
     name = p["place_name"]
     ot = p.get("open_time")
     ct = p.get("close_time")
@@ -560,11 +569,15 @@ def _reply_time_by_mode(api, event, p: dict, mode: str):
         _reply(api, event, [_text(f"🕐 {name} เปิด {ot} น.ค่ะ")])
     elif mode == "close":
         _reply(api, event, [_text(f"🕐 {name} ปิด {ct} น.ค่ะ")])
-    else:
+    else:  # both
         _reply(api, event, [_text(f"🕐 {name} เปิด {ot} - {ct} น.ค่ะ")])
 
 
 def _detect_time_mode(text: str) -> str:
+    """
+    ตรวจว่าผู้ใช้ถามเรื่องอะไร
+    คืนค่า: 'open' | 'close' | 'both'
+    """
     has_open  = any(kw in text for kw in ["เปิดกี่โมง", "เปิดไหม", "เปิดยัง", "เปิดกี่",
                                            "เปิดเวลา", "เปิดตอน", "เปิดได้", "ยังเปิด",
                                            "เปิดอยู่", "เปิดบ้าง"])
@@ -581,10 +594,16 @@ def _detect_time_mode(text: str) -> str:
         return "open"
     if has_close:
         return "close"
-    return "both"
+    return "both"   # default
 
 
 def _detect_category_from_text(text: str) -> str:
+    """
+    ตรวจว่าควรแสดงสถานที่ category ไหน
+    - มีคำว่า 'ร้าน' นำหน้า → eat (ร้านอาหารเท่านั้น)
+    - คำถามทั่วไป เช่น 'ปิดยัง' → all (ทุกสถานที่)
+    คืนค่า: 'eat' | 'all'
+    """
     if any(kw in text for kw in ["ร้านปิด", "ร้านยังปิด", "ร้านเปิด", "ร้านยังเปิด",
                                    "ร้านอาหารปิด", "ร้านอาหารเปิด"]):
         return "eat"
@@ -592,9 +611,13 @@ def _detect_category_from_text(text: str) -> str:
 
 
 # =========================
-# 🕐 ส่ง quick reply ถามสถานที่
+# 🕐 ส่ง quick reply ถามสถานที่ (แยกตาม mode และ category)
 # =========================
 def send_time_picker(api, event, mode: str, category: str = "all"):
+    """
+    mode     = 'open' | 'close' | 'both'
+    category = 'all' | 'eat' | 'travel'
+    """
     if category == "eat":
         rows = get_places_by_category("eat")
         names = [r["place_name"] for r in rows] if rows else []
@@ -608,6 +631,7 @@ def send_time_picker(api, event, mode: str, category: str = "all"):
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
 
+    # label ปุ่ม quick reply ส่ง prefix ตาม mode เพื่อให้ handler รู้ว่าถามอะไร
     prefix_map = {"open": "เวลาเปิดของ", "close": "เวลาปิดของ", "both": "เวลาเปิดปิดของ"}
     prefix = prefix_map[mode]
 
@@ -729,6 +753,7 @@ def handle_message(event):
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
 
+        # ---- รับคำตอบจาก quick reply เวลา (3 mode) ----
         elif text.startswith("เวลาเปิดของ") or text.startswith("เวลาปิดของ") or text.startswith("เวลาเปิดปิดของ"):
             if text.startswith("เวลาเปิดปิดของ"):
                 mode = "both"
@@ -758,6 +783,7 @@ def handle_message(event):
         elif text == "ไม่ใช่":
             _reply(api, event, [_text("ขอโทษค่ะ ลองพิมพ์ใหม่อีกครั้งนะคะ 😊")])
 
+        # ---- ตรวจจับคำถามเรื่องเวลาเปิด/ปิด/เปิดปิด ----
         elif any(kw in text for kw in [
             "เปิดกี่โมง", "เปิดไหม", "เปิดยัง", "เปิดกี่", "เปิดเวลา", "เปิดตอน",
             "ยังเปิด", "เปิดอยู่", "ปิดกี่โมง", "ปิดไหม", "ปิดยัง", "ปิดกี่",
@@ -765,6 +791,7 @@ def handle_message(event):
             "เวลาเปิดปิด", "เปิดปิด", "เวลาทำการ"
         ]):
             mode = _detect_time_mode(text)
+            # เช็คว่ามีชื่อสถานที่ในข้อความหรือเปล่า
             matched_place = None
             for n in get_all_place_names():
                 if n in text:
@@ -777,27 +804,24 @@ def handle_message(event):
                 else:
                     _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {matched_place} ค่ะ")])
             else:
+                # มีคำว่า "ร้าน" นำหน้า → แสดงเฉพาะร้านอาหาร, อื่นๆ → ทุกสถานที่
                 cat = _detect_category_from_text(text)
                 send_time_picker(api, event, mode, cat)
 
-        # ✅ แก้ไข: ดึงจาก DB แทน places.py
+        # ---- แนะนำที่เที่ยว / แนะนำที่กิน → ตอบแบบ list เดิม ----
         elif any(kw in text for kw in [
             "แนะนำที่เที่ยว", "ที่เที่ยวแนะนำ", "ที่เที่ยวดีๆ", "มีที่เที่ยวอะไรบ้าง",
             "แนะนำสถานที่", "สถานที่แนะนำ", "สถานที่น่าเที่ยว",
         ]):
-            rows = get_places_by_category("travel")
-            if rows:
-                msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
-                for i, r in enumerate(rows, 1):
-                    desc = r.get("place_description", "")
-                    short_desc = desc[:50] + "..." if len(desc) > 50 else desc
-                    msg += f"{i}. {r['place_name']}\n"
-                    if short_desc:
-                        msg += f"   ⭐ {short_desc}\n"
-                    msg += "\n"
-                _reply(api, event, [_text(msg.strip())])
-            else:
-                _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
+            travel_names = [
+                name for name, data in places.items()
+                if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+            ]
+            msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
+            for i, name in enumerate(travel_names, 1):
+                p = places[name]
+                msg += f"{i}. {name}\n   ⭐ {p.get('highlight', '')}\n\n"
+            _reply(api, event, [_text(msg.strip())])
 
         elif any(kw in text for kw in [
             "แนะนำที่กิน", "แนะนำร้านอาหาร", "ร้านอาหารแนะนำ", "มีร้านอาหารอะไรบ้าง",
@@ -812,7 +836,7 @@ def handle_message(event):
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
 
-        # ✅ แก้ไข: ดึงจาก DB แทน places.py
+        # ---- ไปไหนดี / อยากเที่ยว → ถามกลับด้วย quick reply กิจกรรม ----
         elif any(kw in text for kw in [
             "ไปไหนดี", "อยากเที่ยว", "เที่ยวไหนดี", "อยากไปเที่ยว",
             "เที่ยวอะไรดี", "จะไปไหน", "ไปเที่ยวอะไรดี", "อยากไป",
@@ -832,6 +856,7 @@ def handle_message(event):
                 )
             ])
 
+        # ─── ส่งให้ Dialogflow แปล Intent ────────────────────────────────
         else:
             try:
                 result = detect_intent(text, session_id=event.source.user_id)
@@ -842,24 +867,21 @@ def handle_message(event):
 
                 if confidence > 0.5:
                     if intent == "recommend_place":
+                        # ถ้า text มี keyword "แนะนำ/มีอะไรบ้าง" → list เดิม
+                        # ถ้า text มี keyword "ไปไหนดี/อยากเที่ยว" → quick reply กิจกรรม
                         if any(kw in text for kw in [
                             "แนะนำที่เที่ยว", "ที่เที่ยวแนะนำ", "สถานที่แนะนำ",
                             "มีที่เที่ยวอะไรบ้าง", "สถานที่น่าเที่ยว", "แนะนำสถานที่",
                         ]):
-                            # ✅ ดึงจาก DB
-                            rows = get_places_by_category("travel")
-                            if rows:
-                                msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
-                                for i, r in enumerate(rows, 1):
-                                    desc = r.get("place_description", "")
-                                    short_desc = desc[:50] + "..." if len(desc) > 50 else desc
-                                    msg += f"{i}. {r['place_name']}\n"
-                                    if short_desc:
-                                        msg += f"   ⭐ {short_desc}\n"
-                                    msg += "\n"
-                                _reply(api, event, [_text(msg.strip())])
-                            else:
-                                _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
+                            travel_names = [
+                                name for name, data in places.items()
+                                if data.get("type") == "place" and name != "แผนที่อำเภอท่ายาง"
+                            ]
+                            msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
+                            for i, name in enumerate(travel_names, 1):
+                                p = places[name]
+                                msg += f"{i}. {name}\n   ⭐ {p.get('highlight', '')}\n\n"
+                            _reply(api, event, [_text(msg.strip())])
                         else:
                             _reply(api, event, [
                                 _text("น้องเพชรมีกิจกรรมแนะนำในท่ายางเลยค่ะ 🗺️"),
