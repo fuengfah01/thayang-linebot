@@ -337,10 +337,6 @@ def send_place_detail(api, event, name):
         return
     cat = "🏛️ สถานที่ท่องเที่ยว" if p["category"] == "travel" else "🍽️ ร้านอาหาร"
     msg = f"{cat}\n\n📍 {p['place_name']}\n\n📖 {p['place_description']}"
-    if p.get("open_time") and p.get("close_time"):
-        msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
-    else:
-        msg += "\n\n🕐 ยังไม่มีข้อมูลเวลาเปิด-ปิดค่ะ"
     _reply(api, event, [_text(msg)])
 
 
