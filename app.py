@@ -264,7 +264,6 @@ def dialogflow_webhook():
     place_name = parameters.get("place-name", "")
 
     if intent in ["recommend_place", "place.travel"]:
-        # ✅ ดึงจาก DB
         rows = get_places_by_category("travel")
         if rows:
             msg = "🏛️ สถานที่ท่องเที่ยวในท่ายาง\n\n"
@@ -286,9 +285,8 @@ def dialogflow_webhook():
         p = search_place(place_name)
         if p:
             cat = "🏛️ สถานที่ท่องเที่ยว" if p["category"] == "travel" else "🍽️ ร้านอาหาร"
+            # ✅ แก้ไข: ไม่แสดงเวลา
             msg = f"{cat}\n\n📍 {p['place_name']}\n\n📖 {p['place_description']}"
-            if p.get("open_time") and p.get("close_time"):
-                msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
         else:
             msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
 
@@ -313,7 +311,7 @@ def dialogflow_webhook():
 # =========================
 # 📍 สถานที่ — ดึงจาก DB เป็นหลัก
 # =========================
-def send_place_detail(api, event, name):
+def send_place_detail(api, event, name, show_time=False):
     # ดึงจาก places.py ก่อน ถ้าไม่เจอค่อยดึงจาก DB
     if name in places:
         p = places[name]
@@ -321,12 +319,17 @@ def send_place_detail(api, event, name):
         if p.get("images"):
             msgs.append(_image(p["images"][0]))
         msgs.append(_text(f"📍 {name}\n\n📖 {p.get('history', '')}"))
+
+        # ✅ แสดงแค่ highlight ไม่มีเวลา
         detail = f"⭐ จุดเด่น\n{p.get('highlight', '')}"
-        if p.get("time"):
-            detail += f"\n\n🕐 เวลา {p['time']} น."
-        if p.get("map"):
-            detail += f"\n\n🗺 {p['map']}"
         msgs.append(_text(detail))
+
+        # ✅ แสดงเวลาเฉพาะเมื่อ show_time=True
+        if show_time and p.get("time"):
+            msgs.append(_text(f"🕐 เวลา {p['time']} น.\n\n🗺 {p.get('map', '')}"))
+        elif p.get("map"):
+            msgs.append(_text(f"🗺 {p['map']}"))
+
         _reply(api, event, msgs)
         return
 
@@ -337,11 +340,18 @@ def send_place_detail(api, event, name):
         return
     cat = "🏛️ สถานที่ท่องเที่ยว" if p["category"] == "travel" else "🍽️ ร้านอาหาร"
     msg = f"{cat}\n\n📍 {p['place_name']}\n\n📖 {p['place_description']}"
+
+    # ✅ แสดงเวลาเฉพาะเมื่อ show_time=True
+    if show_time:
+        if p.get("open_time") and p.get("close_time"):
+            msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
+        else:
+            msg += "\n\n🕐 ยังไม่มีข้อมูลเวลาเปิด-ปิดค่ะ"
+
     _reply(api, event, [_text(msg)])
 
 
 def send_places(api, event):
-    # ✅ ดึงจาก DB แทน places.py
     rows = get_places_by_category("travel")
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
@@ -688,7 +698,7 @@ def handle_message(event):
             send_places(api, event)
 
         elif text in places and text != "แผนที่อำเภอท่ายาง":
-            send_place_detail(api, event, text)
+            send_place_detail(api, event, text)  # show_time=False by default ✅
 
         elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
             send_map(api, event)
@@ -745,7 +755,7 @@ def handle_message(event):
             name = text.replace("ใช่_", "", 1)
             p = search_place(name)
             if p:
-                send_place_detail(api, event, name)
+                send_place_detail(api, event, name)  # show_time=False by default ✅
             elif name in souvenirs:
                 send_souvenir_detail(api, event, name)
             else:
@@ -776,7 +786,6 @@ def handle_message(event):
                 cat = _detect_category_from_text(text)
                 send_time_picker(api, event, mode, cat)
 
-        # ✅ แก้ไข: ดึงจาก DB แทน places.py
         elif any(kw in text for kw in [
             "แนะนำที่เที่ยว", "ที่เที่ยวแนะนำ", "ที่เที่ยวดีๆ", "มีที่เที่ยวอะไรบ้าง",
             "แนะนำสถานที่", "สถานที่แนะนำ", "สถานที่น่าเที่ยว",
@@ -803,7 +812,6 @@ def handle_message(event):
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
 
-        # ✅ แก้ไข: ดึงจาก DB แทน places.py
         elif any(kw in text for kw in [
             "ไปไหนดี", "อยากเที่ยว", "เที่ยวไหนดี", "อยากไปเที่ยว",
             "เที่ยวอะไรดี", "จะไปไหน", "ไปเที่ยวอะไรดี", "อยากไป",
@@ -837,7 +845,6 @@ def handle_message(event):
                             "แนะนำที่เที่ยว", "ที่เที่ยวแนะนำ", "สถานที่แนะนำ",
                             "มีที่เที่ยวอะไรบ้าง", "สถานที่น่าเที่ยว", "แนะนำสถานที่",
                         ]):
-                            # ✅ ดึงจาก DB
                             rows = get_places_by_category("travel")
                             if rows:
                                 msg = "🏛️ สถานที่ท่องเที่ยวแนะนำในอำเภอท่ายางค่ะ\n\n"
@@ -874,12 +881,11 @@ def handle_message(event):
                     elif intent == "place.search" and place_name:
                         p = search_place(place_name)
                         if p:
+                            # ✅ แก้ไข: ไม่แสดงเวลา
                             msg = f"📍 {p['place_name']}\n\n📖 {p['place_description']}"
-                            if p.get("open_time") and p.get("close_time"):
-                                msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
                             _reply(api, event, [_text(msg)])
                         elif place_name in places:
-                            send_place_detail(api, event, place_name)
+                            send_place_detail(api, event, place_name)  # show_time=False ✅
                         else:
                             _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
 
@@ -898,14 +904,14 @@ def handle_message(event):
                     else:
                         p = search_place(text)
                         if p:
-                            send_place_detail(api, event, text)
+                            send_place_detail(api, event, text)  # show_time=False ✅
                         else:
                             ai_answer = ask_ai(text)
                             _reply(api, event, [_text(ai_answer)])
                 else:
                     p = search_place(text)
                     if p:
-                        send_place_detail(api, event, text)
+                        send_place_detail(api, event, text)  # show_time=False ✅
                     else:
                         ai_answer = ask_ai(text)
                         _reply(api, event, [_text(ai_answer)])
@@ -914,7 +920,7 @@ def handle_message(event):
                 print("Dialogflow error:", e)
                 p = search_place(text)
                 if p:
-                    send_place_detail(api, event, text)
+                    send_place_detail(api, event, text)  # show_time=False ✅
                 else:
                     ai_answer = ask_ai(text)
                     _reply(api, event, [_text(ai_answer)])
