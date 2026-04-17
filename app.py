@@ -314,7 +314,6 @@ def dialogflow_webhook():
 # 📍 สถานที่ — ดึงจาก DB เป็นหลัก
 # =========================
 def send_place_detail(api, event, name):
-    # ดึงจาก places.py ก่อน ถ้าไม่เจอค่อยดึงจาก DB
     if name in places:
         p = places[name]
         msgs = []
@@ -322,8 +321,6 @@ def send_place_detail(api, event, name):
             msgs.append(_image(p["images"][0]))
         msgs.append(_text(f"📍 {name}\n\n📖 {p.get('history', '')}"))
         detail = f"⭐ จุดเด่น\n{p.get('highlight', '')}"
-        if p.get("time"):
-            detail += f"\n\n🕐 เวลา {p['time']} น."
         if p.get("map"):
             detail += f"\n\n🗺 {p['map']}"
         msgs.append(_text(detail))
@@ -337,10 +334,6 @@ def send_place_detail(api, event, name):
         return
     cat = "🏛️ สถานที่ท่องเที่ยว" if p["category"] == "travel" else "🍽️ ร้านอาหาร"
     msg = f"{cat}\n\n📍 {p['place_name']}\n\n📖 {p['place_description']}"
-    if p.get("open_time") and p.get("close_time"):
-        msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
-    else:
-        msg += "\n\n🕐 ยังไม่มีข้อมูลเวลาเปิด-ปิดค่ะ"
     _reply(api, event, [_text(msg)])
 
 
