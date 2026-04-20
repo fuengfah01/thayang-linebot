@@ -29,3 +29,11 @@ def detect_intent(text, session_id="user123", language_code="th"):
         "fulfillment_text": response.query_result.fulfillment_text,
         "confidence": response.query_result.intent_detection_confidence,
     }
+
+
+def handle_dialogflow(body):
+    intent = body.get("queryResult", {}).get("intent", {}).get("displayName", "")
+    parameters = body.get("queryResult", {}).get("parameters", {})
+    fulfillment_text = body.get("queryResult", {}).get("fulfillmentText", "ขออภัย ไม่เข้าใจคำถามครับ")
+
+    return {"fulfillmentText": fulfillment_text}
