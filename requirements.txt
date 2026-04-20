@@ -1,6 +1,4 @@
-flask
-gunicorn
-line-bot-sdk
-rapidfuzz
-mysql-connector-python
-google-cloud-dialogflow
+flask==3.0.3
+mysql-connector-python==8.3.0
+gunicorn==22.0.0
+line-bot-sdk==3.11.0
