@@ -37,13 +37,22 @@ def webhook():
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    """Fallback handler — ปกติ Dialogflow ตอบผ่าน /dialogflow"""
-    app.logger.info(f"[LINE] user={event.source.user_id} msg={event.message.text}")
+    user_text = event.message.text
+    user_id   = event.source.user_id
+    app.logger.info(f"[LINE] user={user_id} msg={user_text}")
+
+    try:
+        from dialogflow_handler import detect_intent
+        result = detect_intent(user_text, session_id=user_id)
+        reply  = result["fulfillment_text"] or "ขออภัย ไม่เข้าใจคำถามครับ"
+    except Exception as e:
+        app.logger.error(f"[DIALOGFLOW ERROR] {e}")
+        reply = "ขออภัย เกิดข้อผิดพลาดครับ"
+
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text="รับทราบครับ 🌿")
+        TextSendMessage(text=reply)
     )
-
 
 @app.route("/dialogflow", methods=["POST"])
 def dialogflow_webhook():
