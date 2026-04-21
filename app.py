@@ -92,132 +92,100 @@ def _text(msg: str) -> TextMessage:
 def _image(url: str) -> ImageMessage:
     return ImageMessage(original_content_url=url, preview_image_url=url)
 
+def _valid_url(url) -> bool:
+    """เช็คว่า URL ใช้ได้จริง ต้องขึ้นต้นด้วย http:// หรือ https://"""
+    if not url:
+        return False
+    s = str(url).strip()
+    return s.startswith("http://") or s.startswith("https://")
+
 # =========================
 # 💬 FLEX MESSAGE BUILDERS
 # =========================
 def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_url):
     body_contents = [
-        {
-            "type": "text", "text": name,
-            "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"
-        },
-        {
-            "type": "text", "text": highlight or "สถานที่ท่องเที่ยวในอำเภอท่ายาง",
-            "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"
-        },
+        {"type": "text", "text": name, "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
+        {"type": "text", "text": highlight or "สถานที่ท่องเที่ยวในอำเภอท่ายาง",
+         "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
     ]
     if open_time and close_time:
-        ot = str(open_time)[:5]
-        ct = str(close_time)[:5]
         body_contents.append({
             "type": "text",
-            "text": f"⏰ {ot} – {ct} น.",
+            "text": f"⏰ {str(open_time)[:5]} – {str(close_time)[:5]} น.",
             "size": "sm", "color": "#777777", "margin": "md"
         })
 
     footer_contents = []
-    if map_url:
+    if _valid_url(map_url):
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#2d7a3a", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": str(map_url).strip()}
         })
     footer_contents.append({
         "type": "button", "style": "secondary", "height": "sm",
-        "margin": "sm" if map_url else "none",
         "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": name}
     })
 
     bubble = {
         "type": "bubble",
-        "body": {
-            "type": "box", "layout": "vertical",
-            "contents": body_contents, "paddingAll": "16px"
-        },
-        "footer": {
-            "type": "box", "layout": "vertical", "spacing": "sm",
-            "contents": footer_contents, "paddingAll": "12px"
-        }
+        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"},
+        "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_contents, "paddingAll": "12px"}
     }
-
-    if image_url:
+    if _valid_url(image_url):
         bubble["hero"] = {
-            "type": "image", "url": image_url,
+            "type": "image", "url": str(image_url).strip(),
             "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
         }
-
     return bubble
 
 
 def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours, map_url):
     body_contents = [
-        {
-            "type": "text", "text": name,
-            "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"
-        },
-        {
-            "type": "text", "text": highlight or "ร้านอาหารในอำเภอท่ายาง",
-            "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"
-        },
+        {"type": "text", "text": name, "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
+        {"type": "text", "text": highlight or "ร้านอาหารในอำเภอท่ายาง",
+         "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
     ]
     if open_hours and close_hours:
-        ot = str(open_hours)[:5]
-        ct = str(close_hours)[:5]
         body_contents.append({
-            "type": "text", "text": f"⏰ {ot} – {ct} น.",
+            "type": "text",
+            "text": f"⏰ {str(open_hours)[:5]} – {str(close_hours)[:5]} น.",
             "size": "sm", "color": "#777777", "margin": "md"
         })
 
     footer_contents = []
-    if map_url:
+    if _valid_url(map_url):
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#d97706", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": str(map_url).strip()}
         })
 
     bubble = {
         "type": "bubble",
-        "body": {
-            "type": "box", "layout": "vertical",
-            "contents": body_contents, "paddingAll": "16px"
-        }
+        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"}
     }
-
-    if image_url:
+    if _valid_url(image_url):
         bubble["hero"] = {
-            "type": "image", "url": image_url,
+            "type": "image", "url": str(image_url).strip(),
             "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
         }
-
     if footer_contents:
         bubble["footer"] = {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": footer_contents, "paddingAll": "12px"
         }
-
     return bubble
 
 
 def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
     body_contents = [
-        {
-            "type": "text", "text": name,
-            "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"
-        },
-        {
-            "type": "text", "text": description or "",
-            "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"
-        },
+        {"type": "text", "text": name, "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"},
+        {"type": "text", "text": description or "", "size": "sm", "color": "#555555",
+         "wrap": True, "margin": "sm", "maxLines": 3},
     ]
     if phone:
-        body_contents.append({
-            "type": "text", "text": f"📞 {phone}",
-            "size": "xs", "color": "#555555", "margin": "sm"
-        })
+        body_contents.append({"type": "text", "text": f"📞 {phone}", "size": "xs", "color": "#555555", "margin": "sm"})
     if time_str:
-        body_contents.append({
-            "type": "text", "text": f"⏰ {time_str}",
-            "size": "xs", "color": "#777777", "margin": "sm"
-        })
+        body_contents.append({"type": "text", "text": f"⏰ {time_str}", "size": "xs", "color": "#777777", "margin": "sm"})
 
     footer_contents = [
         {
@@ -225,10 +193,10 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
             "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"รายละเอียดของฝาก {name}"}
         }
     ]
-    if map_url:
+    if _valid_url(map_url):
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#0369a1", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": str(map_url).strip()}
         })
 
     return {
@@ -263,18 +231,13 @@ def home():
 # =========================
 @app.route("/setup-richmenu")
 def setup_richmenu():
-    headers_json = {
-        "Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    headers_json = {"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}", "Content-Type": "application/json"}
     headers_auth = {"Authorization": f"Bearer {CHANNEL_ACCESS_TOKEN}"}
 
-    # ลบเมนูเก่า
     res_list = req.get("https://api.line.me/v2/bot/richmenu/list", headers=headers_auth)
     for menu in res_list.json().get("richmenus", []):
         req.delete(f"https://api.line.me/v2/bot/richmenu/{menu['richMenuId']}", headers=headers_auth)
 
-    # สร้างเมนูใหม่
     body = {
         "size": {"width": 2500, "height": 1686},
         "selected": True,
@@ -295,7 +258,6 @@ def setup_richmenu():
     if not rich_menu_id:
         return f"❌ สร้าง Rich Menu ไม่สำเร็จ: {res.json()}", 500
 
-    # อัพโหลดรูป
     img_path = os.path.join(os.path.dirname(__file__), "richmenu.jpg")
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
@@ -307,7 +269,6 @@ def setup_richmenu():
     else:
         return f"⚠️ Rich Menu ID: {rich_menu_id} สำเร็จ แต่ไม่พบไฟล์ richmenu.jpg", 200
 
-    # ตั้งเป็น default
     req.post(f"https://api.line.me/v2/bot/richmenu/default/{rich_menu_id}", headers=headers_auth)
     return f"✅ Rich Menu สร้างสำเร็จ! ID: {rich_menu_id}"
 
@@ -342,7 +303,6 @@ def dialogflow_webhook():
                 msg += f"{i}. {r['place_name']}\n"
         else:
             msg = "ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ"
-
     elif intent == "place.eat":
         rows = get_all_restaurants()
         if rows:
@@ -351,7 +311,6 @@ def dialogflow_webhook():
                 msg += f"{i}. {r['name']}\n"
         else:
             msg = "ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ"
-
     elif intent == "place.search":
         p = search_place(place_name)
         if p:
@@ -360,7 +319,6 @@ def dialogflow_webhook():
                 msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
         else:
             msg = f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ"
-
     elif intent == "place.opentime":
         if not place_name:
             msg = "ต้องการทราบเวลาเปิด-ปิดของที่ไหนคะ? 🕐"
@@ -384,7 +342,7 @@ def send_place_detail(api, event, name):
     if name in places:
         p = places[name]
         msgs = []
-        if p.get("images"):
+        if p.get("images") and _valid_url(p["images"][0]):
             msgs.append(_image(p["images"][0]))
         msgs.append(_text(f"📍 {name}\n\n📖 {p.get('history', '')}"))
         detail = f"⭐ จุดเด่น\n{p.get('highlight', '')}"
@@ -408,33 +366,32 @@ def send_place_detail(api, event, name):
 
 
 def send_places(api, event):
-    """Flex carousel สถานที่ท่องเที่ยว ดึงจาก DB"""
     rows = get_places_by_category("travel")
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
     bubbles = [_flex_place_bubble(
         r["place_name"], r.get("highlight"), r.get("cover_image"),
-        r.get("open_time"), r.get("close_time"), r.get("map_url")
+        r.get("open_time"), r.get("close_time"),
+        r.get("map_url") if _valid_url(r.get("map_url")) else None
     ) for r in rows]
     _send_flex_carousel(api, event, "สถานที่ท่องเที่ยวในท่ายาง", bubbles)
 
 
 def send_restaurants(api, event):
-    """Flex carousel ร้านอาหาร ดึงจาก DB"""
     rows = get_all_restaurants()
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
         return
     bubbles = [_flex_restaurant_bubble(
         r["name"], r.get("highlight"), r.get("cover_image"),
-        r.get("open_hours"), r.get("close_hours"), r.get("map_url")
+        r.get("open_hours"), r.get("close_hours"),
+        r.get("map_url") if _valid_url(r.get("map_url")) else None
     ) for r in rows]
     _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
 
 
 def send_souvenirs(api, event):
-    """Flex carousel ของฝาก ดึงจาก DB"""
     rows = get_all_souvenirs()
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลของฝากค่ะ")])
@@ -444,9 +401,9 @@ def send_souvenirs(api, event):
         ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
         ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
         time_str = f"{ot}–{ct} น." if ot and ct else ""
+        map_url = r.get("map_url") if _valid_url(r.get("map_url")) else None
         bubbles.append(_flex_souvenir_bubble(
-            r["name"], r.get("description", ""), r.get("phone", ""),
-            time_str, r.get("map_url")  # ← ใช้ map_url จาก DB โดยตรง
+            r["name"], r.get("description", ""), r.get("phone", ""), time_str, map_url
         ))
     _send_flex_carousel(api, event, "ของฝากในท่ายาง", bubbles)
 
@@ -543,7 +500,7 @@ def send_culture(api, event):
     ])
 
 # =========================
-# 🎁 SOUVENIR DETAIL (fallback)
+# 🎁 SOUVENIR DETAIL (fallback dict)
 # =========================
 def send_souvenir_detail(api, event, name):
     s = souvenirs[name]
@@ -591,7 +548,7 @@ def send_food_category_list(api, event, category):
 def send_food_detail(api, event, category, name):
     item = food[category][name]
     msgs = []
-    if item.get("image"):
+    if item.get("image") and _valid_url(item["image"]):
         msgs.append(_image(item["image"]))
     msgs.append(_text(f"🍽 {name}\n\n📜 {item['description']}\n\n⭐ {item['highlight']}"))
     msgs.append(_text(f"📍 สถานที่\n{item['location']}"))
@@ -607,12 +564,9 @@ def _reply_time_by_mode(api, event, p: dict, mode: str):
     if not ot or not ct:
         _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {name} ค่ะ")])
         return
-    if mode == "open":
-        _reply(api, event, [_text(f"🕐 {name} เปิด {ot} น.ค่ะ")])
-    elif mode == "close":
-        _reply(api, event, [_text(f"🕐 {name} ปิด {ct} น.ค่ะ")])
-    else:
-        _reply(api, event, [_text(f"🕐 {name} เปิด {ot} - {ct} น.ค่ะ")])
+    if mode == "open":    _reply(api, event, [_text(f"🕐 {name} เปิด {ot} น.ค่ะ")])
+    elif mode == "close": _reply(api, event, [_text(f"🕐 {name} ปิด {ct} น.ค่ะ")])
+    else:                 _reply(api, event, [_text(f"🕐 {name} เปิด {ot} - {ct} น.ค่ะ")])
 
 def _detect_time_mode(text: str) -> str:
     has_open  = any(kw in text for kw in ["เปิดกี่โมง","เปิดไหม","เปิดยัง","เปิดกี่","เปิดเวลา","เปิดตอน","ยังเปิด","เปิดอยู่"])
@@ -630,22 +584,15 @@ def _detect_category_from_text(text: str) -> str:
 
 def send_time_picker(api, event, mode: str, category: str = "all"):
     if category == "eat":
-        rows = get_places_by_category("eat")
-        names = [r["place_name"] for r in rows] if rows else []
+        rows = get_places_by_category("eat"); names = [r["place_name"] for r in rows] if rows else []
     elif category == "travel":
-        rows = get_places_by_category("travel")
-        names = [r["place_name"] for r in rows] if rows else []
+        rows = get_places_by_category("travel"); names = [r["place_name"] for r in rows] if rows else []
     else:
         names = get_all_place_names()
     if not names:
-        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลค่ะ")])
-        return
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลค่ะ")]); return
     prefix_map   = {"open": "เวลาเปิดของ", "close": "เวลาปิดของ", "both": "เวลาเปิดปิดของ"}
-    question_map = {
-        "open":  "ต้องการทราบเวลาเปิดของที่ไหนคะ? 🕐",
-        "close": "ต้องการทราบเวลาปิดของที่ไหนคะ? 🕐",
-        "both":  "ต้องการทราบเวลาเปิด-ปิดของที่ไหนคะ? 🕐",
-    }
+    question_map = {"open": "ต้องการทราบเวลาเปิดของที่ไหนคะ? 🕐", "close": "ต้องการทราบเวลาปิดของที่ไหนคะ? 🕐", "both": "ต้องการทราบเวลาเปิด-ปิดของที่ไหนคะ? 🕐"}
     _reply(api, event, [TextMessage(
         text=question_map[mode] + "\nกดเลือกได้เลยค่ะ",
         quick_reply=QuickReply(items=[
@@ -706,23 +653,20 @@ def handle_message(event):
             matched_cat = matched_name = None
             for cat in food:
                 if rest.startswith(cat + " "):
-                    matched_cat = cat
-                    matched_name = rest[len(cat) + 1:]
-                    break
+                    matched_cat = cat; matched_name = rest[len(cat) + 1:]; break
             if matched_cat and matched_name in food[matched_cat]:
                 send_food_detail(api, event, matched_cat, matched_name)
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลเมนูนี้ค่ะ")])
 
-        # ── รายละเอียดของฝาก (จาก DB) ──
+        # ── รายละเอียดของฝาก (ดึงจาก DB) ──
         elif text.startswith("รายละเอียดของฝาก "):
             name = text.replace("รายละเอียดของฝาก ", "", 1).strip()
             conn = get_conn()
             cur = conn.cursor(dictionary=True)
             cur.execute("SELECT * FROM souvenir_shop WHERE name = %s LIMIT 1", (name,))
             r = cur.fetchone()
-            cur.close()
-            conn.close()
+            cur.close(); conn.close()
             if r:
                 ot = str(r["open_hours"])[:5] if r.get("open_hours") else "ไม่ระบุ"
                 ct = str(r["close_hours"])[:5] if r.get("close_hours") else "ไม่ระบุ"
@@ -732,13 +676,13 @@ def handle_message(event):
                     f"📞 {r.get('phone','ไม่ระบุ')}\n"
                     f"⏰ {ot} – {ct} น."
                 )
-                if r.get("map_url"):
+                if _valid_url(r.get("map_url")):
                     msg += f"\n🗺 {r['map_url']}"
                 _reply(api, event, [_text(msg)])
             else:
                 _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {name} ค่ะ")])
 
-        # ── ของฝาก detail (fallback) ──
+        # ── ของฝาก detail (fallback dict) ──
         elif text.startswith("ของฝาก "):
             name = text.replace("ของฝาก ", "", 1)
             if name in souvenirs:
@@ -750,7 +694,7 @@ def handle_message(event):
         elif text.startswith("แผนที่ "):
             place_name = text.replace("แผนที่ ", "", 1)
             p = search_place(place_name)
-            if p and p.get("map_url"):
+            if p and _valid_url(p.get("map_url")):
                 _reply(api, event, [_text(f"🗺 แผนที่ {p['place_name']}\n{p['map_url']}")])
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลแผนที่ค่ะ")])
@@ -841,10 +785,8 @@ def handle_message(event):
                 if confidence > 0.5:
                     if intent == "recommend_place":
                         send_places(api, event)
-
                     elif intent == "place.eat":
                         send_restaurants(api, event)
-
                     elif intent == "place.search" and place_name:
                         p = search_place(place_name)
                         if p:
@@ -856,7 +798,6 @@ def handle_message(event):
                             send_place_detail(api, event, place_name)
                         else:
                             _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
-
                     elif intent == "place.opentime":
                         mode = _detect_time_mode(text)
                         if place_name:
@@ -865,7 +806,6 @@ def handle_message(event):
                             else: _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
                         else:
                             send_time_picker(api, event, mode, _detect_category_from_text(text))
-
                     else:
                         p = search_place(text)
                         if p: send_place_detail(api, event, text)
