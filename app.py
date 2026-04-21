@@ -83,7 +83,6 @@ souvenirs = {
 # 🛠 HELPERS
 # =========================
 def _reply(api, event, messages: list):
-    """Reply with guard — ถ้า token หมดอายุจะ log แทน crash"""
     try:
         api.reply_message(
             ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
@@ -249,7 +248,6 @@ def setup_richmenu():
 
 # =========================
 # 🔗 WEBHOOK — LINE
-# ✅ return "OK" ทันที ไม่รอ process
 # =========================
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -336,7 +334,10 @@ def send_places(api, event):
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
-    bubbles = [_flex_place_bubble(r["place_name"], r.get("highlight"), r.get("cover_image"), r.get("open_time"), r.get("close_time"), r.get("map_url")) for r in rows]
+    bubbles = [_flex_place_bubble(
+        r["place_name"], r.get("highlight"), r.get("cover_image"),
+        r.get("open_time"), r.get("close_time"), r.get("map_url")
+    ) for r in rows]
     _send_flex_carousel(api, event, "สถานที่ท่องเที่ยวในท่ายาง", bubbles)
 
 
@@ -345,7 +346,11 @@ def send_restaurants(api, event):
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
         return
-    bubbles = [_flex_restaurant_bubble(r["name"], r.get("highlight"), r.get("cover_image"), r.get("open_hours"), r.get("close_hours"), r.get("map_url")) for r in rows]
+    # ✅ แก้ไข: ส่ง map_url แทน lat/lng
+    bubbles = [_flex_restaurant_bubble(
+        r["name"], r.get("highlight"), r.get("cover_image"),
+        r.get("open_hours"), r.get("close_hours"), r.get("map_url")
+    ) for r in rows]
     _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
 
 
@@ -358,7 +363,10 @@ def send_souvenirs(api, event):
     for r in rows:
         ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
         ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
-        bubbles.append(_flex_souvenir_bubble(r["name"], r.get("description", ""), r.get("phone", ""), f"{ot}–{ct} น." if ot and ct else "", r.get("map_url")))
+        bubbles.append(_flex_souvenir_bubble(
+            r["name"], r.get("description", ""), r.get("phone", ""),
+            f"{ot}–{ct} น." if ot and ct else "", r.get("map_url")
+        ))
     _send_flex_carousel(api, event, "ของฝากในท่ายาง", bubbles)
 
 
@@ -366,7 +374,10 @@ def send_map(api, event):
     names = get_all_place_names()[:9]
     _reply(api, event, [TextMessage(
         text="🗺 เลือกสถานที่ที่ต้องการดูแผนที่ค่ะ",
-        quick_reply=QuickReply(items=[QuickReplyItem(action=MessageAction(label=n[:20], text=f"แผนที่ {n}")) for n in names])
+        quick_reply=QuickReply(items=[
+            QuickReplyItem(action=MessageAction(label=n[:20], text=f"แผนที่ {n}"))
+            for n in names
+        ])
     )])
 
 # =========================
@@ -470,7 +481,10 @@ def send_food_category_list(api, event, category):
     names = list(food[category].keys())
     _reply(api, event, [TextMessage(
         text=f"🍴 {category} ในท่ายาง\n\n" + "\n".join(f"• {n}" for n in names) + "\n\n👆 กดเลือกเมนูที่สนใจได้เลยค่ะ",
-        quick_reply=QuickReply(items=[QuickReplyItem(action=MessageAction(label=n[:20], text=f"เมนู {category} {n}")) for n in names[:13]])
+        quick_reply=QuickReply(items=[
+            QuickReplyItem(action=MessageAction(label=n[:20], text=f"เมนู {category} {n}"))
+            for n in names[:13]
+        ])
     )])
 
 def send_food_detail(api, event, category, name):
@@ -490,7 +504,7 @@ def _reply_time_by_mode(api, event, p: dict, mode: str):
     if not ot or not ct:
         _reply(api, event, [_text(f"ขอโทษค่ะ ยังไม่มีข้อมูลเวลาของ {name} ค่ะ")])
         return
-    if mode == "open":   _reply(api, event, [_text(f"🕐 {name} เปิด {ot} น.ค่ะ")])
+    if mode == "open":    _reply(api, event, [_text(f"🕐 {name} เปิด {ot} น.ค่ะ")])
     elif mode == "close": _reply(api, event, [_text(f"🕐 {name} ปิด {ct} น.ค่ะ")])
     else:                 _reply(api, event, [_text(f"🕐 {name} เปิด {ot} - {ct} น.ค่ะ")])
 
@@ -519,20 +533,23 @@ def send_time_picker(api, event, mode: str, category: str = "all"):
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลค่ะ")])
         return
     prefix_map   = {"open": "เวลาเปิดของ", "close": "เวลาปิดของ", "both": "เวลาเปิดปิดของ"}
-    question_map = {"open": "ต้องการทราบเวลาเปิดของที่ไหนคะ? 🕐", "close": "ต้องการทราบเวลาปิดของที่ไหนคะ? 🕐", "both": "ต้องการทราบเวลาเปิด-ปิดของที่ไหนคะ? 🕐"}
+    question_map = {
+        "open":  "ต้องการทราบเวลาเปิดของที่ไหนคะ? 🕐",
+        "close": "ต้องการทราบเวลาปิดของที่ไหนคะ? 🕐",
+        "both":  "ต้องการทราบเวลาเปิด-ปิดของที่ไหนคะ? 🕐",
+    }
     _reply(api, event, [TextMessage(
         text=question_map[mode] + "\nกดเลือกได้เลยค่ะ",
-        quick_reply=QuickReply(items=[QuickReplyItem(action=MessageAction(label=n[:20], text=f"{prefix_map[mode]}{n}")) for n in names[:13]])
+        quick_reply=QuickReply(items=[
+            QuickReplyItem(action=MessageAction(label=n[:20], text=f"{prefix_map[mode]}{n}"))
+            for n in names[:13]
+        ])
     )])
 
 # =========================
 # 📩 PROCESS MESSAGE — runs in background thread
 # =========================
 def _process_message(reply_token: str, text: str, user_id: str):
-    """
-    ✅ ทำงานใน background thread เพื่อไม่ block webhook route
-    สร้าง fake event จาก reply_token + user_id ที่ดึงออกมาก่อนแล้ว
-    """
     class _Src:
         def __init__(self, uid): self.user_id = uid
     class _Evt:
@@ -668,8 +685,8 @@ def _process_message(reply_token: str, text: str, user_id: str):
             else:
                 try:
                     result = detect_intent(text, session_id=user_id)
-                    intent  = result["intent"]
-                    params  = result["parameters"]
+                    intent     = result["intent"]
+                    params     = result["parameters"]
                     place_name = str(params.get("place-name", "")).strip()
                     confidence = result["confidence"]
 
@@ -707,21 +724,21 @@ def _process_message(reply_token: str, text: str, user_id: str):
                         else: _reply(api, event, [_text(ask_ai(text))])
 
                 except Exception as e:
-                    print("Dialogflow error:", e)
+                    print(f"Dialogflow error: {e}")
                     p = search_place(text)
                     if p: send_place_detail(api, event, text)
                     else: _reply(api, event, [_text(ask_ai(text))])
 
         except Exception as e:
-            print(f"Process message error: {e}")
+            print(f"[ERROR] _process_message: {e}")
+            import traceback; traceback.print_exc()
 
 
 # =========================
-# 📩 HANDLE MESSAGE — ดึง token แล้ว spawn thread ทันที
+# 📩 HANDLE MESSAGE
 # =========================
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    # ✅ ดึงค่าออกมาก่อน spawn thread เพราะ event object อาจเปลี่ยนหลัง return
     reply_token = event.reply_token
     text        = event.message.text.strip()
     user_id     = event.source.user_id
@@ -731,7 +748,6 @@ def handle_message(event):
         args=(reply_token, text, user_id),
         daemon=True
     ).start()
-    # ✅ return ทันที → LINE รับ 200 OK เร็ว → reply token ยังไม่หมดอายุ
 
 
 # =========================
