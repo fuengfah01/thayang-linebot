@@ -131,9 +131,10 @@ def _fmt_time_range(open_val, close_val, fallback: str = "ไม่ระบุ"
 # 💬 FLEX MESSAGE BUILDERS
 # =========================
 def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_url):
+    safe_name = _s(name, "สถานที่")
     desc = _s(highlight, "สถานที่ท่องเที่ยวในอำเภอท่ายาง")
     body_contents = [
-        {"type": "text", "text": _s(name, "สถานที่"), "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
+        {"type": "text", "text": safe_name, "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
         {"type": "text", "text": desc,
          "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
     ]
@@ -151,9 +152,10 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
             "type": "button", "style": "primary", "color": "#2d7a3a", "height": "sm",
             "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": str(map_url).strip()}
         })
+    # message action text ต้องไม่ว่างและไม่ใช่ None
     footer_contents.append({
         "type": "button", "style": "secondary", "height": "sm",
-        "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": name}
+        "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": safe_name}
     })
 
     bubble = {
@@ -170,8 +172,9 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
 
 
 def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours, map_url):
+    safe_name = _s(name, "ร้านอาหาร")
     body_contents = [
-        {"type": "text", "text": _s(name, "ร้านอาหาร"), "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
+        {"type": "text", "text": safe_name, "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
         {"type": "text", "text": _s(highlight, "ร้านอาหารในอำเภอท่ายาง"),
          "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
     ]
@@ -189,28 +192,30 @@ def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours,
             "type": "button", "style": "primary", "color": "#d97706", "height": "sm",
             "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": str(map_url).strip()}
         })
+    # ปุ่มรายละเอียดเสมอ — text ต้องไม่ว่าง
+    footer_contents.append({
+        "type": "button", "style": "secondary", "height": "sm",
+        "action": {"type": "message", "label": "📋 รายละเอียด", "text": f"ข้อมูลร้าน{safe_name}"}
+    })
 
     bubble = {
         "type": "bubble",
-        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"}
+        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"},
+        "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_contents, "paddingAll": "12px"}
     }
     if _valid_url(image_url):
         bubble["hero"] = {
             "type": "image", "url": str(image_url).strip(),
             "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
         }
-    if footer_contents:
-        bubble["footer"] = {
-            "type": "box", "layout": "vertical", "spacing": "sm",
-            "contents": footer_contents, "paddingAll": "12px"
-        }
     return bubble
 
 
 def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
+    safe_name = _s(name, "ร้านของฝาก")
     body_contents = [
-        {"type": "text", "text": name, "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"},
-        {"type": "text", "text": description or "", "size": "sm", "color": "#555555",
+        {"type": "text", "text": safe_name, "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"},
+        {"type": "text", "text": _s(description, ""), "size": "sm", "color": "#555555",
          "wrap": True, "margin": "sm", "maxLines": 3},
     ]
     if phone:
@@ -221,7 +226,7 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
     footer_contents = [
         {
             "type": "button", "style": "secondary", "height": "sm",
-            "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"รายละเอียดของฝาก {name}"}
+            "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"รายละเอียดของฝาก {safe_name}"}
         }
     ]
     if _valid_url(map_url):
@@ -408,10 +413,14 @@ def send_places(api, event):
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
     bubbles = [_flex_place_bubble(
-        r["place_name"], r.get("highlight"), r.get("cover_image"),
+        r.get("place_name"), r.get("highlight"),
+        r.get("cover_image") if _valid_url(r.get("cover_image")) else None,
         r.get("open_time"), r.get("close_time"),
         r.get("map_url") if _valid_url(r.get("map_url")) else None
-    ) for r in rows]
+    ) for r in rows if r.get("place_name")]
+    if not bubbles:
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
+        return
     _send_flex_carousel(api, event, "สถานที่ท่องเที่ยวในท่ายาง", bubbles)
 
 
@@ -421,10 +430,14 @@ def send_restaurants(api, event):
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
         return
     bubbles = [_flex_restaurant_bubble(
-        r["name"], r.get("highlight"), r.get("cover_image"),
+        r.get("name"), r.get("highlight"),
+        r.get("cover_image") if _valid_url(r.get("cover_image")) else None,
         r.get("open_hours"), r.get("close_hours"),
         r.get("map_url") if _valid_url(r.get("map_url")) else None
-    ) for r in rows]
+    ) for r in rows if r.get("name")]
+    if not bubbles:
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
+        return
     _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
 
 
@@ -447,7 +460,10 @@ def send_souvenirs(api, event):
 
 
 def send_map(api, event):
-    names = get_all_place_names()[:9]
+    names = [n for n in get_all_place_names()[:9] if n and str(n).strip()]
+    if not names:
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลแผนที่ค่ะ")])
+        return
     _reply(api, event, [
         TextMessage(
             text="🗺 เลือกสถานที่ที่ต้องการดูแผนที่ค่ะ",
@@ -630,6 +646,8 @@ def send_time_picker(api, event, mode: str, category: str = "all"):
         rows = get_places_by_category("travel"); names = [r["place_name"] for r in rows] if rows else []
     else:
         names = get_all_place_names()
+    # กรอง None และ string ว่างออก
+    names = [n for n in names if n and str(n).strip()]
     if not names:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลค่ะ")]); return
     prefix_map   = {"open": "เวลาเปิดของ", "close": "เวลาปิดของ", "both": "เวลาเปิดปิดของ"}
