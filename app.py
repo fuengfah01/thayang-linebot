@@ -11,7 +11,7 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from db import (
     search_place, get_places_by_category, get_all_place_names,
-    get_all_restaurants, get_all_souvenirs
+    get_all_restaurants, get_all_souvenirs, get_conn
 )
 from info import info
 from food import food
@@ -150,13 +150,22 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
 
 def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours, map_url):
     body_contents = [
-        {"type": "text", "text": name, "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"},
-        {"type": "text", "text": highlight or "ร้านอาหารในอำเภอท่ายาง", "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
+        {
+            "type": "text", "text": name,
+            "weight": "bold", "size": "lg", "wrap": True, "color": "#1a1a2e"
+        },
+        {
+            "type": "text", "text": highlight or "ร้านอาหารในอำเภอท่ายาง",
+            "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"
+        },
     ]
     if open_hours and close_hours:
         ot = str(open_hours)[:5]
         ct = str(close_hours)[:5]
-        body_contents.append({"type": "text", "text": f"⏰ {ot} – {ct} น.", "size": "sm", "color": "#777777", "margin": "md"})
+        body_contents.append({
+            "type": "text", "text": f"⏰ {ot} – {ct} น.",
+            "size": "sm", "color": "#777777", "margin": "md"
+        })
 
     footer_contents = []
     if map_url:
@@ -167,43 +176,67 @@ def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours,
 
     bubble = {
         "type": "bubble",
-        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"}
+        "body": {
+            "type": "box", "layout": "vertical",
+            "contents": body_contents, "paddingAll": "16px"
+        }
     }
+
     if image_url:
-        bubble["hero"] = {"type": "image", "url": image_url, "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"}
+        bubble["hero"] = {
+            "type": "image", "url": image_url,
+            "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
+        }
+
     if footer_contents:
-        bubble["footer"] = {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_contents, "paddingAll": "12px"}
+        bubble["footer"] = {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": footer_contents, "paddingAll": "12px"
+        }
+
     return bubble
 
 
 def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
     body_contents = [
-        {"type": "text", "text": name, "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"},
-        {"type": "text", "text": description or "", "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
+        {
+            "type": "text", "text": name,
+            "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"
+        },
+        {
+            "type": "text", "text": description or "",
+            "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"
+        },
     ]
     if phone:
-        body_contents.append({"type": "text", "text": f"📞 {phone}", "size": "xs", "color": "#555555", "margin": "sm"})
+        body_contents.append({
+            "type": "text", "text": f"📞 {phone}",
+            "size": "xs", "color": "#555555", "margin": "sm"
+        })
     if time_str:
-        body_contents.append({"type": "text", "text": f"⏰ {time_str}", "size": "xs", "color": "#777777", "margin": "sm"})
+        body_contents.append({
+            "type": "text", "text": f"⏰ {time_str}",
+            "size": "xs", "color": "#777777", "margin": "sm"
+        })
 
-    footer_buttons = [
+    footer_contents = [
         {
             "type": "button", "style": "secondary", "height": "sm",
-            "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"ของฝาก {name}"}
+            "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"รายละเอียดของฝาก {name}"}
         }
     ]
     if map_url:
-        footer_buttons.append({
+        footer_contents.append({
             "type": "button", "style": "primary", "color": "#0369a1", "height": "sm",
             "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
         })
 
-    bubble = {
+    return {
         "type": "bubble", "size": "kilo",
         "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"},
-        "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_buttons, "paddingAll": "10px"}
+        "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_contents, "paddingAll": "10px"}
     }
-    return bubble
+
 
 def _send_flex_carousel(api, event, alt_text, bubbles):
     bubbles = [b for b in bubbles if b][:10]
@@ -387,20 +420,17 @@ def send_places(api, event):
     _send_flex_carousel(api, event, "สถานที่ท่องเที่ยวในท่ายาง", bubbles)
 
 
-def send_souvenirs(api, event):
-    rows = get_all_souvenirs()
+def send_restaurants(api, event):
+    """Flex carousel ร้านอาหาร ดึงจาก DB"""
+    rows = get_all_restaurants()
     if not rows:
-        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลของฝากค่ะ")])
+        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
         return
-    bubbles = []
-    for r in rows:
-        ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
-        ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
-        time_str = f"{ot}–{ct} น." if ot and ct else ""
-        bubbles.append(_flex_souvenir_bubble(
-            r["name"], r.get("description", ""), r.get("phone", ""), time_str, r.get("map_url")
-        ))
-    _send_flex_carousel(api, event, "ของฝากในท่ายาง", bubbles)
+    bubbles = [_flex_restaurant_bubble(
+        r["name"], r.get("highlight"), r.get("cover_image"),
+        r.get("open_hours"), r.get("close_hours"), r.get("map_url")
+    ) for r in rows]
+    _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
 
 
 def send_souvenirs(api, event):
@@ -411,12 +441,12 @@ def send_souvenirs(api, event):
         return
     bubbles = []
     for r in rows:
-        map_url = f"https://maps.google.com/?q={r['lat']},{r['lng']}" if r.get("lat") and r.get("lng") else None
         ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
         ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
         time_str = f"{ot}–{ct} น." if ot and ct else ""
         bubbles.append(_flex_souvenir_bubble(
-            r["name"], r.get("description", ""), r.get("phone", ""), time_str, map_url
+            r["name"], r.get("description", ""), r.get("phone", ""),
+            time_str, r.get("map_url")  # ← ใช้ map_url จาก DB โดยตรง
         ))
     _send_flex_carousel(api, event, "ของฝากในท่ายาง", bubbles)
 
@@ -684,7 +714,31 @@ def handle_message(event):
             else:
                 _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลเมนูนี้ค่ะ")])
 
-        # ── ของฝาก detail ──
+        # ── รายละเอียดของฝาก (จาก DB) ──
+        elif text.startswith("รายละเอียดของฝาก "):
+            name = text.replace("รายละเอียดของฝาก ", "", 1).strip()
+            conn = get_conn()
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT * FROM souvenir_shop WHERE name = %s LIMIT 1", (name,))
+            r = cur.fetchone()
+            cur.close()
+            conn.close()
+            if r:
+                ot = str(r["open_hours"])[:5] if r.get("open_hours") else "ไม่ระบุ"
+                ct = str(r["close_hours"])[:5] if r.get("close_hours") else "ไม่ระบุ"
+                msg = (
+                    f"🎁 {r['name']}\n\n"
+                    f"📜 {r.get('description','')}\n\n"
+                    f"📞 {r.get('phone','ไม่ระบุ')}\n"
+                    f"⏰ {ot} – {ct} น."
+                )
+                if r.get("map_url"):
+                    msg += f"\n🗺 {r['map_url']}"
+                _reply(api, event, [_text(msg)])
+            else:
+                _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {name} ค่ะ")])
+
+        # ── ของฝาก detail (fallback) ──
         elif text.startswith("ของฝาก "):
             name = text.replace("ของฝาก ", "", 1)
             if name in souvenirs:
