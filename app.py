@@ -148,9 +148,8 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
     return bubble
 
 
-def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours, lat, lng):
-    map_url = f"https://maps.google.com/?q={lat},{lng}" if lat and lng else None
-
+def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours, map_url):
+    # ✅ แก้ไข: รับ map_url โดยตรงแทน lat/lng (ตาม schema ใหม่ของตาราง restaurant)
     body_contents = [
         {
             "type": "text", "text": name,
@@ -430,8 +429,12 @@ def send_restaurants(api, event):
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
         return
     bubbles = [_flex_restaurant_bubble(
-        r["name"], r.get("highlight"), r.get("cover_image"),
-        r.get("open_hours"), r.get("close_hours"), r.get("lat"), r.get("lng")
+        r["name"],
+        r.get("highlight"),
+        r.get("cover_image"),
+        r.get("open_hours"),
+        r.get("close_hours"),
+        r.get("map_url"),          # ✅ ดึง map_url โดยตรง (schema ใหม่ไม่มี lat/lng)
     ) for r in rows]
     _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
 
@@ -444,7 +447,8 @@ def send_souvenirs(api, event):
         return
     bubbles = []
     for r in rows:
-        map_url = f"https://maps.google.com/?q={r['lat']},{r['lng']}" if r.get("lat") and r.get("lng") else None
+        # ✅ ดึง map_url โดยตรงจาก souvenir_shop (schema ใหม่มีคอลัมน์ map_url แล้ว)
+        map_url = r.get("map_url")
         ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
         ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
         time_str = f"{ot}–{ct} น." if ot and ct else ""
