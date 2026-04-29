@@ -375,9 +375,10 @@ def send_places(api, event):
 
 
 def send_restaurants(api, event):
+    # ✅ แก้ไข: ใช้ text สั้นๆ ตรงกับ elif ด้านล่าง
     quick_reply = QuickReply(items=[
-        QuickReplyItem(action=MessageAction(label="🍜 อาหารคาว", text="ร้านอาหารคาว")),
-        QuickReplyItem(action=MessageAction(label="🍮 อาหารหวาน", text="ร้านอาหารหวาน")),
+        QuickReplyItem(action=MessageAction(label="🍜 อาหารคาว", text="อาหารคาว")),
+        QuickReplyItem(action=MessageAction(label="🍮 อาหารหวาน", text="อาหารหวาน")),
     ])
     msg = TextMessage(
         text="อยากกินอะไรดีคะ? 😊\nเลือกประเภทอาหารได้เลยค่ะ",
@@ -678,11 +679,8 @@ def _process_message(reply_token: str, text: str, user_id: str):
         event = _Evt(reply_token, user_id)
 
         try:
-            print(f"[DEBUG] raw text bytes: {text.encode('utf-8')}")
-            print(f"[DEBUG] text repr: {repr(text)}")
-            print(f"[MSG] user={user_id} text={repr(text)}")
-
             t = text.strip()
+            print(f"[MSG] user={user_id} text={repr(t)}")
 
             # ── ทักทาย ──
             if t.lower() in ["สวัสดี", "สวัสดีค่ะ", "สวัสดีครับ", "สวัสดีค่า", "สวัสดีคับ",
@@ -706,11 +704,12 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t in ["food", "ร้านอาหาร", "ร้านอาหารในอำเภอท่ายาง", "อาหาร", "กินอะไรดี", "อาหารแนะนำ"]:
                 send_restaurants(api, event)
 
-            elif t in ["ร้านอาหารคาว", "อาหารคาว", "คาว"]:
+            # ✅ แก้ไข: ย้ายขึ้นมาก่อน และเพิ่ม keyword ให้ครอบคลุม
+            elif t in ["อาหารคาว", "ร้านอาหารคาว", "คาว"]:
                 print(f"[ROUTE] matched อาหารคาว")
                 send_restaurants_by_category(api, event, "อาหารคาว")
 
-            elif t in ["ร้านอาหารหวาน", "อาหารหวาน", "หวาน"]:
+            elif t in ["อาหารหวาน", "ร้านอาหารหวาน", "หวาน"]:
                 print(f"[ROUTE] matched อาหารหวาน")
                 send_restaurants_by_category(api, event, "อาหารหวาน")
 
