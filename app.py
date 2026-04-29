@@ -12,7 +12,7 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from db import (
     search_place, get_places_by_category, get_all_place_names,
     get_restaurants_by_category, get_all_souvenirs, get_about,
-    get_restaurant_categories, get_restaurant_detail
+    get_restaurant_detail
 )
 from places import places
 from ai_helper import ask_ai
@@ -405,7 +405,6 @@ def send_souvenirs(api, event):
     for r in rows:
         ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
         ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
-        # Build bubble with cover_image
         bubble = {
             "type": "bubble",
             "body": {
@@ -539,10 +538,6 @@ def send_souvenir_detail(api, event, name):
         shop_text += f"\n{i}. {shop['name']}\n   📍 {shop['address']}\n   📞 {shop['tel']}\n   ⏰ {shop['time']}\n   🗺 {shop['map']}"
     msgs.append(_text(shop_text))
     _reply(api, event, msgs)
-
-# =========================
-# 🍽 FOOD FUNCTIONS
-# =========================
 
 # =========================
 # 🍽 FOOD FROM DB
