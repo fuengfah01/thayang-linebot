@@ -26,7 +26,6 @@ import requests as req
 from urllib.parse import quote
 
 def _safe_uri(url: str) -> str:
-    """Encode Thai chars in map URLs so LINE accepts them."""
     if not url:
         return "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
     if "?" not in url:
@@ -365,16 +364,23 @@ def send_places(api, event):
 
 
 def send_restaurants(api, event):
-    rows = get_all_restaurants()
-    if not rows:
-        _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
-        return
-    # ✅ แก้ไข: ส่ง map_url แทน lat/lng
-    bubbles = [_flex_restaurant_bubble(
-        r["name"], r.get("highlight"), r.get("cover_image"),
-        r.get("open_hours"), r.get("close_hours"), r.get("map_url")
-    ) for r in rows]
-    _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
+    try:
+        rows = get_all_restaurants()
+        print(f"[REST] got {len(rows) if rows else 0} rows")
+        if not rows:
+            _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
+            return
+        for r in rows:
+            print(f"[REST MAP] {r.get('name','?')} => {r.get('map_url','NONE')!r}")
+        bubbles = [_flex_restaurant_bubble(
+            r["name"], r.get("highlight"), r.get("cover_image"),
+            r.get("open_hours"), r.get("close_hours"), r.get("map_url")
+        ) for r in rows]
+        _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
+    except Exception as e:
+        print(f"[REST ERROR] {e}")
+        import traceback; traceback.print_exc()
+        _reply(api, event, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดในการโหลดข้อมูลร้านอาหารค่ะ")])
 
 
 def send_souvenirs(api, event):
@@ -386,10 +392,37 @@ def send_souvenirs(api, event):
     for r in rows:
         ot = str(r["open_hours"])[:5] if r.get("open_hours") else ""
         ct = str(r["close_hours"])[:5] if r.get("close_hours") else ""
-        bubbles.append(_flex_souvenir_bubble(
-            r["name"], r.get("description", ""), r.get("phone", ""),
-            f"{ot}–{ct} น." if ot and ct else "", r.get("map_url")
-        ))
+        # Build bubble with cover_image
+        bubble = {
+            "type": "bubble",
+            "body": {
+                "type": "box", "layout": "vertical", "spacing": "sm",
+                "contents": [
+                    {"type": "text", "text": r["name"], "weight": "bold", "size": "md", "wrap": True, "color": "#0369a1"},
+                    {"type": "text", "text": r.get("description") or "", "size": "sm", "color": "#666666", "wrap": True, "maxLines": 3},
+                    {"type": "separator"},
+                    {"type": "box", "layout": "horizontal", "contents": [
+                        {"type": "text", "text": "📞 " + (r.get("phone") or "-"), "size": "xs", "color": "#888888", "flex": 1},
+                    ]},
+                    {"type": "box", "layout": "horizontal", "contents": [
+                        {"type": "text", "text": f"🕐 {ot}–{ct} น." if ot and ct else "🕐 -", "size": "xs", "color": "#888888", "flex": 1},
+                    ]},
+                ]
+            },
+            "footer": {
+                "type": "box", "layout": "vertical",
+                "contents": [
+                    {"type": "button", "style": "primary", "height": "sm",
+                     "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(r.get("map_url") or "")}}
+                ]
+            }
+        }
+        if r.get("cover_image"):
+            bubble["hero"] = {
+                "type": "image", "url": r["cover_image"],
+                "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
+            }
+        bubbles.append(bubble)
     _send_flex_carousel(api, event, "ของฝากในท่ายาง", bubbles)
 
 
