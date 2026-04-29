@@ -340,6 +340,8 @@ def send_places(api, event):
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
+    for r in rows:
+        print(f"[MAP_URL place] {r.get(chr(39)+'place_name'+chr(39),'?')} => {r.get(chr(39)+'map_url'+chr(39),'NONE')!r}")
     bubbles = [_flex_place_bubble(
         r["place_name"], r.get("highlight"), r.get("cover_image"),
         r.get("open_time"), r.get("close_time"), r.get("map_url")
