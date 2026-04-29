@@ -1,5 +1,5 @@
 import mysql.connector
-from mysql.connector import Error
+from mysql.connector import Error, pooling
 from urllib.parse import quote
 
 DB_CONFIG = {
@@ -8,10 +8,31 @@ DB_CONFIG = {
     "user": "sql7824635",
     "password": "iUz24J2d6E",
     "database": "sql7824635",
-    "connection_timeout": 10,
+    "connection_timeout": 5,   # ✅ ลดจาก 10 → 5
+    "connect_timeout": 5,      # ✅ เพิ่ม (บางเวอร์ชันใช้ชื่อนี้)
+    "autocommit": True,        # ✅ ไม่ต้อง commit ทุกครั้ง
 }
 
+# ✅ ใช้ connection pool แทนเปิด/ปิดทุกครั้ง
+try:
+    _pool = pooling.MySQLConnectionPool(
+        pool_name="thayang_pool",
+        pool_size=3,
+        **DB_CONFIG
+    )
+    print("[DB] Connection pool created OK")
+except Error as e:
+    print(f"[DB ERROR] Pool creation failed: {e}")
+    _pool = None
+
+
 def get_connection():
+    if _pool:
+        try:
+            return _pool.get_connection()
+        except Error as e:
+            print(f"[DB ERROR] pool.get_connection failed: {e}")
+    # fallback: direct connect
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         return conn
@@ -19,11 +40,10 @@ def get_connection():
         print(f"[DB ERROR] get_connection failed: {e}")
         raise
 
-# alias
 get_conn = get_connection
 
+
 def _fix_map_url(row):
-    """Ensure map_url is a valid URI (encode Thai characters if present)."""
     if not row:
         return row
     url = row.get("map_url") or ""
@@ -34,86 +54,61 @@ def _fix_map_url(row):
         row["map_url"] = "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
     return row
 
-def search_place(keyword):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT * FROM chatbot_place WHERE place_name LIKE %s LIMIT 1",
-            (f"%{keyword}%",)
-        )
-        result = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return _fix_map_url(result)
-    except Error as e:
-        print(f"[DB ERROR] search_place({keyword}): {e}")
-        return None
 
-def get_places_by_category(category):
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT * FROM chatbot_place WHERE category = %s ORDER BY place_id",
-            (category,)
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return [_fix_map_url(r) for r in rows]
-    except Error as e:
-        print(f"[DB ERROR] get_places_by_category({category}): {e}")
-        return []
-
-def get_all_place_names():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT place_name FROM chatbot_place ORDER BY place_id")
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return [r["place_name"] for r in rows]
-    except Error as e:
-        print(f"[DB ERROR] get_all_place_names: {e}")
-        return []
-
-def get_all_restaurants():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM restaurant ORDER BY restaurant_id")
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return [_fix_map_url(r) for r in rows]
-    except Error as e:
-        print(f"[DB ERROR] get_all_restaurants: {e}")
-        return []
-
-def get_all_souvenirs():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return [_fix_map_url(r) for r in rows]
-    except Error as e:
-        print(f"[DB ERROR] get_all_souvenirs: {e}")
-        return []
-
-def query_one(sql, args=()):
+def _execute(sql, args=()):
+    """✅ Helper กลาง: เปิด conn → query → ปิด พร้อม error handling"""
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(sql, args)
-        result = cursor.fetchone()
+        rows = cursor.fetchall()
         cursor.close()
-        conn.close()
-        return _fix_map_url(result)
+        return rows
     except Error as e:
-        print(f"[DB ERROR] query_one: {e}")
-        return None
+        print(f"[DB ERROR] query failed: {e} | sql={sql!r}")
+        return []
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def search_place(keyword):
+    rows = _execute(
+        "SELECT * FROM chatbot_place WHERE place_name LIKE %s LIMIT 1",
+        (f"%{keyword}%",)
+    )
+    return _fix_map_url(rows[0]) if rows else None
+
+
+def get_places_by_category(category):
+    rows = _execute(
+        "SELECT * FROM chatbot_place WHERE category = %s ORDER BY place_id",
+        (category,)
+    )
+    return [_fix_map_url(r) for r in rows]
+
+
+def get_all_place_names():
+    rows = _execute("SELECT place_name FROM chatbot_place ORDER BY place_id")
+    return [r["place_name"] for r in rows]
+
+
+def get_all_restaurants():
+    print("[DB] get_all_restaurants query start")
+    rows = _execute("SELECT * FROM restaurant ORDER BY restaurant_id")
+    print(f"[DB] get_all_restaurants got {len(rows)} rows")
+    return [_fix_map_url(r) for r in rows]
+
+
+def get_all_souvenirs():
+    rows = _execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
+    return [_fix_map_url(r) for r in rows]
+
+
+def query_one(sql, args=()):
+    rows = _execute(sql, args)
+    return _fix_map_url(rows[0]) if rows else None

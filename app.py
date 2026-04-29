@@ -367,18 +367,29 @@ def send_places(api, event):
 def send_restaurants(api, event):
     try:
         print("[REST] calling get_all_restaurants()...")
-        rows = get_all_restaurants()
-        print(f"[REST] got {len(rows) if rows else 0} rows, type={type(rows)}")
+        
+        # ✅ ใช้ thread + timeout เพื่อกัน hang
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(get_all_restaurants)
+            try:
+                rows = future.result(timeout=10)  # timeout 10 วินาที
+            except concurrent.futures.TimeoutError:
+                print("[REST ERROR] get_all_restaurants() timeout!")
+                _reply(api, event, [_text("ขอโทษค่ะ ระบบใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้งค่ะ")])
+                return
+
+        print(f"[REST] got {len(rows) if rows else 0} rows")
         if not rows:
             _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
             return
         for r in rows:
-            print(f"[REST ROW] {dict(r)}")  # ✅ print full row
+            print(f"[REST ROW] {dict(r)}")
         bubbles = [_flex_restaurant_bubble(
             r["name"], r.get("highlight"), r.get("cover_image"),
             r.get("open_hours"), r.get("close_hours"), r.get("map_url")
         ) for r in rows]
-        print(f"[REST] built {len(bubbles)} bubbles, sending carousel...")
+        print(f"[REST] built {len(bubbles)} bubbles, sending...")
         _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
         print("[REST] done")
     except Exception as e:
