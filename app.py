@@ -11,9 +11,8 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from db import (
     search_place, get_places_by_category, get_all_place_names,
-    get_restaurants_by_category, get_all_souvenirs
+    get_restaurants_by_category, get_all_souvenirs, get_about
 )
-from info import info
 from food import food
 from places import places
 from ai_helper import ask_ai
@@ -365,7 +364,6 @@ def send_places(api, event):
 
 def send_restaurants(api, event):
     """ถามก่อนว่าจะกินคาวหรือหวาน"""
-    from linebot.v3.messaging import QuickReply, QuickReplyItem, MessageAction
     quick_reply = QuickReply(items=[
         QuickReplyItem(action=MessageAction(label="🍜 อาหารคาว", text="ร้านอาหารคาว")),
         QuickReplyItem(action=MessageAction(label="🍮 อาหารหวาน", text="ร้านอาหารหวาน")),
@@ -698,12 +696,14 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 send_culture(api, event)
 
             elif text in INFO_KEY_MAP:
-                _reply(api, event, [_text(info.get(INFO_KEY_MAP[text], "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ"))])
+                content_text = get_about(INFO_KEY_MAP[text])
+                _reply(api, event, [_text(content_text if content_text else "ขอโทษค่ะ ยังไม่มีข้อมูลนี้ค่ะ")])
 
             elif text.startswith("วัฒนธรรม "):
                 place_name = text.replace("วัฒนธรรม ", "", 1)
                 key = CULTURE_KEY_MAP.get(place_name)
-                _reply(api, event, [_text(info[key] if key and key in info else "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
+                culture_text = get_about(key) if key else ""
+                _reply(api, event, [_text(culture_text if culture_text else "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
 
             elif text in places and text != "แผนที่อำเภอท่ายาง":
                 send_place_detail(api, event, text)
