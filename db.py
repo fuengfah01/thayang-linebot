@@ -2,11 +2,11 @@ import mysql.connector
 from mysql.connector import Error
 
 DB_CONFIG = {
-    "host": "junction.proxy.rlwy.net",
-    "port": 37604,
-    "user": "root",
-    "password": "LtvqydRohNxyXdZZQhtZPqEAgfiZuvsy",
-    "database": "railway",
+    "host": "sql7.freesqldatabase.com",
+    "port": 3306,
+    "user": "sql7824635",
+    "password": "iUz24J2d6E",
+    "database": "sql7824635",
     "connection_timeout": 10,
 }
 
