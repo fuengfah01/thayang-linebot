@@ -217,6 +217,20 @@ def _send_flex_carousel(api, event, alt_text, bubbles):
     container = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
     _reply(api, event, [FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(container))])
 
+def ask_food_category():
+    return TextSendMessage(
+        text="อยากดูอาหารประเภทไหนคะ 🍽️",
+        quick_reply=QuickReply(
+            items=[
+                QuickReplyButton(
+                    action=MessageAction(label="อาหารคาว", text="อาหารคาว")
+                ),
+                QuickReplyButton(
+                    action=MessageAction(label="อาหารหวาน", text="อาหารหวาน")
+                )
+            ]
+        )
+    )
 
 # =========================
 # 🖼 ROUTES
