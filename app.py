@@ -306,13 +306,13 @@ def setup_richmenu():
 def webhook():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
+    print(f"[WEBHOOK] received body_len={len(body)} sig={signature[:10]}...")  # ✅ เพิ่ม
     try:
         handler.handle(body, signature)
     except Exception as e:
-        print("Webhook error:", e)
+        print(f"[WEBHOOK ERROR] {e}")  # ✅ เพิ่ม
     return "OK"
-
-
+    
 # =========================
 # 🔗 WEBHOOK — DIALOGFLOW
 # =========================
