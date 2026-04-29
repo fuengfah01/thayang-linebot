@@ -1,7 +1,7 @@
 from flask import Flask, request, send_from_directory, jsonify
 from linebot.v3.messaging import (
     ApiClient, Configuration, MessagingApi,
-    ReplyMessageRequest, PushMessageRequest,
+    ReplyMessageRequest,
     TextMessage, ImageMessage, FlexMessage,
     QuickReply, QuickReplyItem, MessageAction,
 )
@@ -23,16 +23,6 @@ import random
 import os
 import threading
 import requests as req
-from urllib.parse import quote
-
-def _safe_uri(url: str) -> str:
-    """Encode Thai characters in map URLs so LINE accepts them."""
-    if not url:
-        return "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
-    if "q=" in url:
-        base, q = url.split("q=", 1)
-        return base + "q=" + quote(q, safe=",+&:/")
-    return url
 
 app = Flask(__name__)
 
@@ -93,19 +83,12 @@ souvenirs = {
 # 🛠 HELPERS
 # =========================
 def _reply(api, event, messages: list):
-    """Always use Push API to avoid reply token expiry on slow DB queries."""
     try:
-        user_id = event.source.user_id
-        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
+        api.reply_message(
+            ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
+        )
     except Exception as e:
-        print(f"Push error: {e}")
-        # Fallback to reply token
-        try:
-            api.reply_message(
-                ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
-            )
-        except Exception as e2:
-            print(f"Reply fallback error: {e2}")
+        print(f"Reply error (token expired?): {e}")
 
 def _text(msg: str) -> TextMessage:
     return TextMessage(text=msg)
@@ -131,7 +114,7 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
     if map_url:
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#2d7a3a", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
         })
     footer_contents.append({
         "type": "button", "style": "secondary", "height": "sm",
@@ -164,7 +147,7 @@ def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours,
     if map_url:
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#d97706", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
         })
 
     bubble = {
@@ -196,7 +179,7 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
         bubble["footer"] = {
             "type": "box", "layout": "vertical", "paddingAll": "10px",
             "contents": [{"type": "button", "style": "primary", "color": "#0369a1", "height": "sm",
-                          "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}}]
+                          "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}}]
         }
     return bubble
 
@@ -204,9 +187,15 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
 def _send_flex_carousel(api, event, alt_text, bubbles):
     bubbles = [b for b in bubbles if b][:10]
     if not bubbles:
+        print(f"[CAROUSEL] no bubbles for {alt_text}")
         return
-    container = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
-    _reply(api, event, [FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(container))])
+    print(f"[CAROUSEL] sending {len(bubbles)} bubbles for {alt_text}")
+    try:
+        container = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
+        _reply(api, event, [FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(container))])
+    except Exception as e:
+        print(f"[CAROUSEL ERROR] {e}")
+        import traceback; traceback.print_exc()
 
 # =========================
 # 🖼 ROUTES
@@ -579,6 +568,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
         event = _Evt(reply_token, user_id)
 
         try:
+            print(f"[MSG] user={user_id} text={text!r}")
             # ── ทักทาย ──
             if text.lower() in ["สวัสดี","สวัสดีค่ะ","สวัสดีครับ","สวัสดีค่า","สวัสดีคับ",
                                  "หวัดดีค่ะ","หวัดดีงับ","ดี","ดีจ้า","หวัดดีคับ","หวัดดี","hi","hello"]:
