@@ -13,7 +13,6 @@ DB_CONFIG = {
     "autocommit": True,
 }
 
-
 def _fix_map_url(row):
     if not row:
         return row
@@ -32,7 +31,6 @@ def _fix_map_url(row):
         print(f"[MAP URL ERROR] {e}")
     return row
 
-
 def get_connection():
     try:
         return mysql.connector.connect(**DB_CONFIG)
@@ -42,7 +40,6 @@ def get_connection():
 
 # legacy alias
 get_conn = get_connection
-
 
 def _execute(sql, args=()):
     conn = None
@@ -63,18 +60,15 @@ def _execute(sql, args=()):
             except Exception:
                 pass
 
-
 # =========================
 # chatbot_place
 # =========================
-
 def search_place(keyword):
     rows = _execute(
         "SELECT * FROM chatbot_place WHERE place_name LIKE %s LIMIT 1",
         (f"%{keyword}%",)
     )
     return _fix_map_url(rows[0]) if rows else None
-
 
 def get_places_by_category(category):
     rows = _execute(
@@ -83,16 +77,13 @@ def get_places_by_category(category):
     )
     return [_fix_map_url(r) for r in rows]
 
-
 def get_all_place_names():
     rows = _execute("SELECT place_name FROM chatbot_place ORDER BY place_id")
     return [r["place_name"] for r in rows]
 
-
 # =========================
 # restaurant
 # =========================
-
 def get_restaurants_by_category(category):
     rows = _execute(
         "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id LIMIT 5",
@@ -100,20 +91,23 @@ def get_restaurants_by_category(category):
     )
     return [_fix_map_url(r) for r in rows]
 
+def get_restaurant_detail(name: str):
+    rows = _execute(
+        "SELECT * FROM restaurant WHERE name = %s LIMIT 1",
+        (name,)
+    )
+    return _fix_map_url(rows[0]) if rows else None
 
 # =========================
 # souvenir_shop
 # =========================
-
 def get_all_souvenirs():
     rows = _execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
     return [_fix_map_url(r) for r in rows]
 
-
 # =========================
 # about_us
 # =========================
-
 def get_about(section: str) -> str:
     rows = _execute(
         "SELECT content FROM about_us WHERE section = %s LIMIT 1",
@@ -121,11 +115,9 @@ def get_about(section: str) -> str:
     )
     return rows[0]["content"] if rows else ""
 
-
 # =========================
 # misc
 # =========================
-
 def query_one(sql, args=()):
     rows = _execute(sql, args)
     return _fix_map_url(rows[0]) if rows else None
