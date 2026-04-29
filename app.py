@@ -274,6 +274,7 @@ def setup_richmenu():
 def webhook():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
+    print(f"[WEBHOOK] received body={body[:100]} sig={signature[:20]}")  # เพิ่มบรรทัดนี้
     try:
         handler.handle(body, signature)
     except Exception as e:
