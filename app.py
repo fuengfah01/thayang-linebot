@@ -13,8 +13,7 @@ from db import (
     search_place, get_places_by_category, get_all_place_names,
     get_all_restaurants, get_all_souvenirs
 )
-from info import info
-from food import food
+
 from places import places
 from ai_helper import ask_ai
 from dialogflow_handler import detect_intent
