@@ -366,18 +366,21 @@ def send_places(api, event):
 
 def send_restaurants(api, event):
     try:
+        print("[REST] calling get_all_restaurants()...")
         rows = get_all_restaurants()
-        print(f"[REST] got {len(rows) if rows else 0} rows")
+        print(f"[REST] got {len(rows) if rows else 0} rows, type={type(rows)}")
         if not rows:
             _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ")])
             return
         for r in rows:
-            print(f"[REST MAP] {r.get('name','?')} => {r.get('map_url','NONE')!r}")
+            print(f"[REST ROW] {dict(r)}")  # ✅ print full row
         bubbles = [_flex_restaurant_bubble(
             r["name"], r.get("highlight"), r.get("cover_image"),
             r.get("open_hours"), r.get("close_hours"), r.get("map_url")
         ) for r in rows]
+        print(f"[REST] built {len(bubbles)} bubbles, sending carousel...")
         _send_flex_carousel(api, event, "ร้านอาหารในท่ายาง", bubbles)
+        print("[REST] done")
     except Exception as e:
         print(f"[REST ERROR] {e}")
         import traceback; traceback.print_exc()
@@ -636,8 +639,13 @@ def _process_message(reply_token: str, text: str, user_id: str):
 
             elif text in ["travel", "สถานที่ท่องเที่ยว"]:
                 send_places(api, event)
-            elif text in ["food", "ร้านอาหาร", "ร้านอาหารในอำเภอท่ายาง", "อาหาร", "กินอะไรดี", "อาหารแนะนำ"]:
+
+            # ✅ แก้: เพิ่ม keywords ครอบคลุมขึ้น + log ชัดเจน
+            elif text in ["food", "ร้านอาหาร", "ร้านอาหารในอำเภอท่ายาง", "อาหาร", 
+                          "กินอะไรดี", "อาหารแนะนำ", "ร้านอาหารแนะนำ", "แนะนำร้านอาหาร"]:
+                print(f"[ROUTE] -> send_restaurants (exact match: {text!r})")
                 send_restaurants(api, event)
+
             elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
             elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
@@ -722,6 +730,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 send_places(api, event)
 
             elif any(kw in text for kw in ["แนะนำที่กิน","แนะนำร้านอาหาร","ร้านอาหารแนะนำ","มีร้านอาหารอะไรบ้าง","ร้านไหนอร่อย"]):
+                print(f"[ROUTE] -> send_restaurants (keyword match: {text!r})")
                 send_restaurants(api, event)
 
             elif any(kw in text for kw in ["ไปไหนดี","อยากเที่ยว","เที่ยวไหนดี","น่าเที่ยว","เที่ยวที่ไหนดี"]):
@@ -741,12 +750,14 @@ def _process_message(reply_token: str, text: str, user_id: str):
 
             # ── Dialogflow fallback ──
             else:
+                print(f"[ROUTE] -> dialogflow fallback for {text!r}")
                 try:
                     result = detect_intent(text, session_id=user_id)
                     intent     = result["intent"]
                     params     = result["parameters"]
                     place_name = str(params.get("place-name", "")).strip()
                     confidence = result["confidence"]
+                    print(f"[DF] intent={intent!r} confidence={confidence} place={place_name!r}")
 
                     if confidence > 0.5:
                         if intent == "recommend_place":
@@ -782,7 +793,8 @@ def _process_message(reply_token: str, text: str, user_id: str):
                         else: _reply(api, event, [_text(ask_ai(text))])
 
                 except Exception as e:
-                    print(f"Dialogflow error: {e}")
+                    print(f"[DF ERROR] {e}")
+                    import traceback; traceback.print_exc()
                     p = search_place(text)
                     if p: send_place_detail(api, event, text)
                     else: _reply(api, event, [_text(ask_ai(text))])
@@ -790,7 +802,6 @@ def _process_message(reply_token: str, text: str, user_id: str):
         except Exception as e:
             print(f"[ERROR] _process_message: {e}")
             import traceback; traceback.print_exc()
-
 
 # =========================
 # 📩 HANDLE MESSAGE
