@@ -26,8 +26,9 @@ import requests as req
 from urllib.parse import quote
 
 def _safe_uri(url: str) -> str:
-    if not url:
+    if not url or not url.startswith("http"):
         return "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
+
     if "?" not in url:
         return url
     base, qs = url.split("?", 1)
