@@ -101,18 +101,12 @@ def get_all_place_names():
 # restaurant
 # =========================
 
-def get_all_restaurants():
-    print("[DB] get_all_restaurants query start")
-    rows = _execute("SELECT * FROM restaurant ORDER BY restaurant_id")
-    print(f"[DB] get_all_restaurants got {len(rows)} rows")
-
-    fixed_rows = [_fix_map_url(r) for r in rows]
-
-    for r in fixed_rows:
-        print("[RESTAURANT]", r.get("name"), r.get("map_url"))
-
-    return fixed_rows
-
+def get_restaurants_by_category(category):
+    rows = _execute(
+        "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id LIMIT 5",
+        (category,)
+    )
+    return [_fix_map_url(r) for r in rows]
 
 # =========================
 # souvenir_shop
