@@ -274,10 +274,15 @@ def setup_richmenu():
 def webhook():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
+
+    # ✅ DEBUG: ยืนยันว่า webhook ได้รับ request จริง
+    print(f"[WEBHOOK] body_len={len(body)} sig={'OK' if signature else 'MISSING'}")
+
     try:
         handler.handle(body, signature)
     except Exception as e:
-        print("Webhook error:", e)
+        print(f"[WEBHOOK ERROR] {e}")
+        import traceback; traceback.print_exc()
     return "OK"
 
 # =========================
@@ -379,8 +384,9 @@ def send_restaurants(api, event):
 def send_restaurants_by_category(api, event, category_th: str):
     """โหลดร้านอาหารตาม category แล้วส่ง carousel"""
     try:
+        print(f"[FOOD] send_restaurants_by_category called: category={repr(category_th)}")
         rows = get_restaurants_by_category(category_th)
-        print(f"[REST] category={category_th!r} got {len(rows)} rows")
+        print(f"[FOOD] DB returned {len(rows)} rows")
         if not rows:
             _reply(api, event, [_text(f"ยังไม่มีข้อมูลร้าน{category_th}ค่ะ 🙏")])
             return
@@ -645,7 +651,8 @@ def _process_message(reply_token: str, text: str, user_id: str):
         event = _Evt(reply_token, user_id)
 
         try:
-            print(f"[MSG] user={user_id} text={text!r}")
+            print(f"[MSG] user={user_id} text={repr(text)}")
+
             # ── ทักทาย ──
             if text.lower() in ["สวัสดี","สวัสดีค่ะ","สวัสดีครับ","สวัสดีค่า","สวัสดีคับ",
                                  "หวัดดีค่ะ","หวัดดีงับ","ดี","ดีจ้า","หวัดดีคับ","หวัดดี","hi","hello"]:
@@ -662,18 +669,28 @@ def _process_message(reply_token: str, text: str, user_id: str):
 
             elif text in ["travel", "สถานที่ท่องเที่ยว"]:
                 send_places(api, event)
+
             elif text in ["food", "ร้านอาหาร", "ร้านอาหารในอำเภอท่ายาง", "อาหาร", "กินอะไรดี", "อาหารแนะนำ"]:
                 send_restaurants(api, event)
+
+            # ✅ FIX: จับ "ร้านอาหารคาว" และ "ร้านอาหารหวาน" ก่อน Dialogflow
             elif text in ["ร้านอาหารคาว", "อาหารคาว", "คาว"]:
+                print(f"[ROUTE] matched อาหารคาว: {repr(text)}")
                 send_restaurants_by_category(api, event, "อาหารคาว")
+
             elif text in ["ร้านอาหารหวาน", "อาหารหวาน", "หวาน"]:
+                print(f"[ROUTE] matched อาหารหวาน: {repr(text)}")
                 send_restaurants_by_category(api, event, "อาหารหวาน")
+
             elif text in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
+
             elif text in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
                 send_map(api, event)
+
             elif text in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
                 send_souvenirs(api, event)
+
             elif text in ["info", "เกี่ยวกับเรา"]:
                 send_info(api, event)
 
@@ -766,12 +783,14 @@ def _process_message(reply_token: str, text: str, user_id: str):
 
             # ── Dialogflow fallback ──
             else:
+                print(f"[DIALOGFLOW] falling through to dialogflow: {repr(text)}")
                 try:
                     result = detect_intent(text, session_id=user_id)
                     intent     = result["intent"]
                     params     = result["parameters"]
                     place_name = str(params.get("place-name", "")).strip()
                     confidence = result["confidence"]
+                    print(f"[DIALOGFLOW] intent={intent} confidence={confidence} place={repr(place_name)}")
 
                     if confidence > 0.5:
                         if intent == "recommend_place":
@@ -807,7 +826,8 @@ def _process_message(reply_token: str, text: str, user_id: str):
                         else: _reply(api, event, [_text(ask_ai(text))])
 
                 except Exception as e:
-                    print(f"Dialogflow error: {e}")
+                    print(f"[DIALOGFLOW ERROR] {e}")
+                    import traceback; traceback.print_exc()
                     p = search_place(text)
                     if p: send_place_detail(api, event, text)
                     else: _reply(api, event, [_text(ask_ai(text))])
@@ -825,6 +845,9 @@ def handle_message(event):
     reply_token = event.reply_token
     text        = event.message.text.strip()
     user_id     = event.source.user_id
+
+    # ✅ DEBUG: ยืนยันว่า handler รับข้อความได้จริง
+    print(f"[HANDLE_MESSAGE] user={user_id} text={repr(text)}")
 
     threading.Thread(
         target=_process_message,
