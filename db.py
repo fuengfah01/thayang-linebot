@@ -1,6 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
-from urllib.parse import quote
+from urllib.parse import quote_plus
 
 DB_CONFIG = {
     "host": "sql7.freesqldatabase.com",
@@ -13,25 +13,37 @@ DB_CONFIG = {
     "autocommit": True,
 }
 
-get_conn = None  # legacy alias, set below
+get_conn = None  # legacy alias
 
 
 def _fix_map_url(row):
     if not row:
         return row
-    url = row.get("map_url") or ""
-    if url and "q=" in url:
-        base, q = url.split("q=", 1)
-        row["map_url"] = base + "q=" + quote(q, safe=",+&:/")
-    elif not url:
+
+    url = (row.get("map_url") or "").strip()
+
+    if not url:
         row["map_url"] = "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
+        return row
+
+    try:
+        if "?q=" in url:
+            base, q = url.split("?q=", 1)
+            row["map_url"] = base + "?q=" + quote_plus(q)
+
+        elif "query=" in url:
+            base, q = url.split("query=", 1)
+            row["map_url"] = base + "query=" + quote_plus(q)
+
+    except Exception as e:
+        print(f"[MAP URL ERROR] {e}")
+
     return row
 
 
 def get_connection():
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
+        return mysql.connector.connect(**DB_CONFIG)
     except Error as e:
         print(f"[DB ERROR] get_connection failed: {e}")
         raise
@@ -41,7 +53,6 @@ get_conn = get_connection
 
 
 def _execute(sql, args=()):
-    """Central helper: open → query → close, always."""
     conn = None
     try:
         conn = get_connection()
@@ -94,7 +105,13 @@ def get_all_restaurants():
     print("[DB] get_all_restaurants query start")
     rows = _execute("SELECT * FROM restaurant ORDER BY restaurant_id")
     print(f"[DB] get_all_restaurants got {len(rows)} rows")
-    return [_fix_map_url(r) for r in rows]
+
+    fixed_rows = [_fix_map_url(r) for r in rows]
+
+    for r in fixed_rows:
+        print("[RESTAURANT]", r.get("name"), r.get("map_url"))
+
+    return fixed_rows
 
 
 # =========================
@@ -107,14 +124,10 @@ def get_all_souvenirs():
 
 
 # =========================
-# about_us  (แทน info.py)
+# about_us
 # =========================
 
 def get_about(section: str) -> str:
-    """
-    section: 'highlight' | 'lifestyle' | 'culture' | 'contact'
-    Returns content string or empty string.
-    """
     rows = _execute(
         "SELECT content FROM about_us WHERE section = %s LIMIT 1",
         (section,)
@@ -123,41 +136,47 @@ def get_about(section: str) -> str:
 
 
 def get_history() -> str:
-    """ประวัติท่ายาง — ดึงจาก chatbot_place ทุก travel รวมกัน (fallback)"""
     rows = _execute(
-        "SELECT place_name, place_description FROM chatbot_place WHERE category='travel' ORDER BY place_id LIMIT 3"
+        "SELECT place_name, place_description FROM chatbot_place "
+        "WHERE category='travel' ORDER BY place_id LIMIT 3"
     )
+
     if not rows:
         return "ขอโทษค่ะ ยังไม่มีข้อมูลประวัติค่ะ"
+
     return "📜 ประวัติสถานที่สำคัญในท่ายาง\n\n" + "\n\n".join(
-        f"📍 {r['place_name']}\n{r['place_description'][:200]}..." for r in rows
+        f"📍 {r['place_name']}\n{r['place_description'][:200]}..."
+        for r in rows
     )
 
 
 # =========================
-# activity  (แทน activity_details dict)
+# activity
 # =========================
 
 def get_activity_detail(name: str) -> str:
-    """
-    name: ชื่อกิจกรรม เช่น 'ไหว้พระในท่ายาง'
-    Returns formatted string.
-    """
     rows = _execute(
         "SELECT * FROM activity WHERE name = %s LIMIT 1",
         (name,)
     )
+
     if not rows:
         return None
+
     a = rows[0]
+
     emoji_map = {
-        "ไหว้พระ":    "🙏",
-        "ถ่ายรูป":    "📸",
+        "ไหว้พระ": "🙏",
+        "ถ่ายรูป": "📸",
         "ให้อาหารปลา": "🐟",
-        "ตะลอนกิน":   "🍜",
+        "ตะลอนกิน": "🍜",
     }
+
     emoji = emoji_map.get(a.get("type", ""), "🧭")
-    places_list = "\n".join(f"• {p.strip()}" for p in (a.get("description") or "").split(","))
+    places_list = "\n".join(
+        f"• {p.strip()}" for p in (a.get("description") or "").split(",")
+    )
+
     return f"{emoji} {a['name']}\n\n{places_list}"
 
 
