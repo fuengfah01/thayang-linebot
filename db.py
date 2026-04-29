@@ -1,5 +1,5 @@
 import mysql.connector
-from mysql.connector import Error, pooling
+from mysql.connector import Error
 from urllib.parse import quote
 
 DB_CONFIG = {
@@ -8,39 +8,12 @@ DB_CONFIG = {
     "user": "sql7824635",
     "password": "iUz24J2d6E",
     "database": "sql7824635",
-    "connection_timeout": 5,   # ✅ ลดจาก 10 → 5
-    "connect_timeout": 5,      # ✅ เพิ่ม (บางเวอร์ชันใช้ชื่อนี้)
-    "autocommit": True,        # ✅ ไม่ต้อง commit ทุกครั้ง
+    "connection_timeout": 8,
+    "connect_timeout": 8,
+    "autocommit": True,
 }
 
-# ✅ ใช้ connection pool แทนเปิด/ปิดทุกครั้ง
-try:
-    _pool = pooling.MySQLConnectionPool(
-        pool_name="thayang_pool",
-        pool_size=3,
-        **DB_CONFIG
-    )
-    print("[DB] Connection pool created OK")
-except Error as e:
-    print(f"[DB ERROR] Pool creation failed: {e}")
-    _pool = None
-
-
-def get_connection():
-    if _pool:
-        try:
-            return _pool.get_connection()
-        except Error as e:
-            print(f"[DB ERROR] pool.get_connection failed: {e}")
-    # fallback: direct connect
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
-    except Error as e:
-        print(f"[DB ERROR] get_connection failed: {e}")
-        raise
-
-get_conn = get_connection
+get_conn = None  # legacy alias, set below
 
 
 def _fix_map_url(row):
@@ -55,8 +28,20 @@ def _fix_map_url(row):
     return row
 
 
+def get_connection():
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        return conn
+    except Error as e:
+        print(f"[DB ERROR] get_connection failed: {e}")
+        raise
+
+
+get_conn = get_connection
+
+
 def _execute(sql, args=()):
-    """✅ Helper กลาง: เปิด conn → query → ปิด พร้อม error handling"""
+    """Central helper: open → query → close, always."""
     conn = None
     try:
         conn = get_connection()
@@ -75,6 +60,10 @@ def _execute(sql, args=()):
             except Exception:
                 pass
 
+
+# =========================
+# chatbot_place
+# =========================
 
 def search_place(keyword):
     rows = _execute(
@@ -97,6 +86,10 @@ def get_all_place_names():
     return [r["place_name"] for r in rows]
 
 
+# =========================
+# restaurant
+# =========================
+
 def get_all_restaurants():
     print("[DB] get_all_restaurants query start")
     rows = _execute("SELECT * FROM restaurant ORDER BY restaurant_id")
@@ -104,10 +97,77 @@ def get_all_restaurants():
     return [_fix_map_url(r) for r in rows]
 
 
+# =========================
+# souvenir_shop
+# =========================
+
 def get_all_souvenirs():
     rows = _execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
     return [_fix_map_url(r) for r in rows]
 
+
+# =========================
+# about_us  (แทน info.py)
+# =========================
+
+def get_about(section: str) -> str:
+    """
+    section: 'highlight' | 'lifestyle' | 'culture' | 'contact'
+    Returns content string or empty string.
+    """
+    rows = _execute(
+        "SELECT content FROM about_us WHERE section = %s LIMIT 1",
+        (section,)
+    )
+    return rows[0]["content"] if rows else ""
+
+
+def get_history() -> str:
+    """ประวัติท่ายาง — ดึงจาก chatbot_place ทุก travel รวมกัน (fallback)"""
+    rows = _execute(
+        "SELECT place_name, place_description FROM chatbot_place WHERE category='travel' ORDER BY place_id LIMIT 3"
+    )
+    if not rows:
+        return "ขอโทษค่ะ ยังไม่มีข้อมูลประวัติค่ะ"
+    return "📜 ประวัติสถานที่สำคัญในท่ายาง\n\n" + "\n\n".join(
+        f"📍 {r['place_name']}\n{r['place_description'][:200]}..." for r in rows
+    )
+
+
+# =========================
+# activity  (แทน activity_details dict)
+# =========================
+
+def get_activity_detail(name: str) -> str:
+    """
+    name: ชื่อกิจกรรม เช่น 'ไหว้พระในท่ายาง'
+    Returns formatted string.
+    """
+    rows = _execute(
+        "SELECT * FROM activity WHERE name = %s LIMIT 1",
+        (name,)
+    )
+    if not rows:
+        return None
+    a = rows[0]
+    emoji_map = {
+        "ไหว้พระ":    "🙏",
+        "ถ่ายรูป":    "📸",
+        "ให้อาหารปลา": "🐟",
+        "ตะลอนกิน":   "🍜",
+    }
+    emoji = emoji_map.get(a.get("type", ""), "🧭")
+    places_list = "\n".join(f"• {p.strip()}" for p in (a.get("description") or "").split(","))
+    return f"{emoji} {a['name']}\n\n{places_list}"
+
+
+def get_all_activities():
+    return _execute("SELECT * FROM activity ORDER BY activity_id")
+
+
+# =========================
+# misc
+# =========================
 
 def query_one(sql, args=()):
     rows = _execute(sql, args)
