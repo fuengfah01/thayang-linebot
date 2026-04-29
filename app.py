@@ -274,7 +274,6 @@ def setup_richmenu():
 def webhook():
     body = request.get_data(as_text=True)
     signature = request.headers.get("X-Line-Signature", "")
-    print(f"[WEBHOOK] received body={body[:100]} sig={signature[:20]}")  # เพิ่มบรรทัดนี้
     try:
         handler.handle(body, signature)
     except Exception as e:
@@ -378,6 +377,7 @@ def send_restaurants(api, event):
 
 
 def send_restaurants_by_category(api, event, category_th: str):
+    """โหลดร้านอาหารตาม category แล้วส่ง carousel"""
     try:
         rows = get_restaurants_by_category(category_th)
         print(f"[REST] category={category_th!r} got {len(rows)} rows")
@@ -389,9 +389,7 @@ def send_restaurants_by_category(api, event, category_th: str):
             r.get("open_hours"), r.get("close_hours"), r.get("map_url")
         ) for r in rows]
         label = "อาหารคาว 🍜" if category_th == "อาหารคาว" else "อาหารหวาน 🍮"
-        print(f"[REST] sending {len(bubbles)} bubbles")  # เพิ่มบรรทัดนี้
         _send_flex_carousel(api, event, f"ร้าน{label}ในท่ายาง", bubbles)
-        print(f"[REST] done sending")  # เพิ่มบรรทัดนี้
     except Exception as e:
         print(f"[REST ERROR] {e}")
         import traceback; traceback.print_exc()
