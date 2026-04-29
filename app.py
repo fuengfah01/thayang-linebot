@@ -11,7 +11,7 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from db import (
     search_place, get_places_by_category, get_all_place_names,
-    get_all_restaurants, get_all_souvenirs
+    get_restaurants_by_category, get_all_souvenirs
 )
 from info import info
 from food import food
@@ -295,7 +295,7 @@ def dialogflow_webhook():
         rows = get_places_by_category("travel")
         msg = "🏛️ สถานที่ท่องเที่ยวในท่ายาง\n\n" + "".join(f"{i}. {r['place_name']}\n" for i, r in enumerate(rows, 1)) if rows else "ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ"
     elif intent == "place.eat":
-        rows = get_all_restaurants()
+        rows = get_restaurants_by_category("อาหารคาว") + get_restaurants_by_category("อาหารหวาน")
         msg = "🍽️ ร้านอาหารในท่ายาง\n\n" + "".join(f"{i}. {r['name']}\n" for i, r in enumerate(rows, 1)) if rows else "ขอโทษค่ะ ยังไม่มีข้อมูลร้านอาหารค่ะ"
     elif intent == "place.search":
         p = search_place(place_name)
@@ -381,16 +381,7 @@ def send_restaurants(api, event):
 def send_restaurants_by_category(api, event, category_th: str):
     """โหลดร้านอาหารตาม category แล้วส่ง carousel"""
     try:
-        from db import get_conn
-        conn = get_conn()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id",
-            (category_th,)
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        rows = get_restaurants_by_category(category_th)
         print(f"[REST] category={category_th!r} got {len(rows)} rows")
         if not rows:
             _reply(api, event, [_text(f"ยังไม่มีข้อมูลร้าน{category_th}ค่ะ 🙏")])
