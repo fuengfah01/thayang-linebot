@@ -1,7 +1,7 @@
 from flask import Flask, request, send_from_directory, jsonify
 from linebot.v3.messaging import (
     ApiClient, Configuration, MessagingApi,
-    ReplyMessageRequest,
+    ReplyMessageRequest, PushMessageRequest,
     TextMessage, ImageMessage, FlexMessage,
     QuickReply, QuickReplyItem, MessageAction,
 )
@@ -23,6 +23,24 @@ import random
 import os
 import threading
 import requests as req
+from urllib.parse import quote
+
+def _safe_uri(url: str) -> str:
+    """Encode Thai chars in map URLs so LINE accepts them."""
+    if not url:
+        return "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
+    if "?" not in url:
+        return url
+    base, qs = url.split("?", 1)
+    parts = []
+    for param in qs.split("&"):
+        if "=" in param:
+            k, v = param.split("=", 1)
+            parts.append(k + "=" + quote(v.replace("+", " "), safe=""))
+        else:
+            parts.append(param)
+    return base + "?" + "&".join(parts)
+
 
 app = Flask(__name__)
 
@@ -84,11 +102,16 @@ souvenirs = {
 # =========================
 def _reply(api, event, messages: list):
     try:
-        api.reply_message(
-            ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
-        )
+        user_id = event.source.user_id
+        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
     except Exception as e:
-        print(f"Reply error (token expired?): {e}")
+        print(f"[PUSH FAIL] {e}")
+        try:
+            api.reply_message(
+                ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
+            )
+        except Exception as e2:
+            print(f"[REPLY FAIL] {e2}")
 
 def _text(msg: str) -> TextMessage:
     return TextMessage(text=msg)
@@ -114,7 +137,7 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
     if map_url:
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#2d7a3a", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}
         })
     footer_contents.append({
         "type": "button", "style": "secondary", "height": "sm",
@@ -147,7 +170,7 @@ def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours,
     if map_url:
         footer_contents.append({
             "type": "button", "style": "primary", "color": "#d97706", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}
+            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}
         })
 
     bubble = {
@@ -179,7 +202,7 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
         bubble["footer"] = {
             "type": "box", "layout": "vertical", "paddingAll": "10px",
             "contents": [{"type": "button", "style": "primary", "color": "#0369a1", "height": "sm",
-                          "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": map_url}}]
+                          "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}}]
         }
     return bubble
 
@@ -187,15 +210,9 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
 def _send_flex_carousel(api, event, alt_text, bubbles):
     bubbles = [b for b in bubbles if b][:10]
     if not bubbles:
-        print(f"[CAROUSEL] no bubbles for {alt_text}")
         return
-    print(f"[CAROUSEL] sending {len(bubbles)} bubbles for {alt_text}")
-    try:
-        container = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
-        _reply(api, event, [FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(container))])
-    except Exception as e:
-        print(f"[CAROUSEL ERROR] {e}")
-        import traceback; traceback.print_exc()
+    container = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
+    _reply(api, event, [FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(container))])
 
 # =========================
 # 🖼 ROUTES
@@ -340,8 +357,6 @@ def send_places(api, event):
     if not rows:
         _reply(api, event, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
         return
-    for r in rows:
-        print(f"[MAP_URL place] {r.get(chr(39)+'place_name'+chr(39),'?')} => {r.get(chr(39)+'map_url'+chr(39),'NONE')!r}")
     bubbles = [_flex_place_bubble(
         r["place_name"], r.get("highlight"), r.get("cover_image"),
         r.get("open_time"), r.get("close_time"), r.get("map_url")
