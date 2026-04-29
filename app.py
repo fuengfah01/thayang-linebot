@@ -1,7 +1,7 @@
 from flask import Flask, request, send_from_directory, jsonify
 from linebot.v3.messaging import (
     ApiClient, Configuration, MessagingApi,
-    ReplyMessageRequest,
+    ReplyMessageRequest, PushMessageRequest,
     TextMessage, ImageMessage, FlexMessage,
     QuickReply, QuickReplyItem, MessageAction,
 )
@@ -93,12 +93,19 @@ souvenirs = {
 # 🛠 HELPERS
 # =========================
 def _reply(api, event, messages: list):
+    """Always use Push API to avoid reply token expiry on slow DB queries."""
     try:
-        api.reply_message(
-            ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
-        )
+        user_id = event.source.user_id
+        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
     except Exception as e:
-        print(f"Reply error (token expired?): {e}")
+        print(f"Push error: {e}")
+        # Fallback to reply token
+        try:
+            api.reply_message(
+                ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
+            )
+        except Exception as e2:
+            print(f"Reply fallback error: {e2}")
 
 def _text(msg: str) -> TextMessage:
     return TextMessage(text=msg)
