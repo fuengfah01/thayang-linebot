@@ -11,9 +11,9 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from db import (
     search_place, get_places_by_category, get_all_place_names,
-    get_restaurants_by_category, get_all_souvenirs, get_about
+    get_restaurants_by_category, get_all_souvenirs, get_about,
+    get_restaurant_categories, get_restaurant_detail
 )
-from food import food
 from places import places
 from ai_helper import ask_ai
 from dialogflow_handler import detect_intent
@@ -543,27 +543,46 @@ def send_souvenir_detail(api, event, name):
 # =========================
 # 🍽 FOOD FUNCTIONS
 # =========================
-def send_food_category_list(api, event, category):
-    if category not in food:
-        _reply(api, event, [_text("ขอโทษค่ะ ไม่พบหมวดนี้ค่ะ")])
-        return
-    names = list(food[category].keys())
-    _reply(api, event, [TextMessage(
-        text=f"🍴 {category} ในท่ายาง\n\n" + "\n".join(f"• {n}" for n in names) + "\n\n👆 กดเลือกเมนูที่สนใจได้เลยค่ะ",
-        quick_reply=QuickReply(items=[
-            QuickReplyItem(action=MessageAction(label=n[:20], text=f"เมนู {category} {n}"))
-            for n in names[:13]
-        ])
-    )])
 
-def send_food_detail(api, event, category, name):
-    item = food[category][name]
-    msgs = []
-    if item.get("image"):
-        msgs.append(_image(item["image"]))
-    msgs.append(_text(f"🍽 {name}\n\n📜 {item['description']}\n\n⭐ {item['highlight']}"))
-    msgs.append(_text(f"📍 สถานที่\n{item['location']}"))
-    _reply(api, event, msgs)
+# =========================
+# 🍽 FOOD FROM DB
+# =========================
+def send_food_menu_list(api, event, category_th: str):
+    """แสดงรายการเมนูในหมวดที่เลือก"""
+    try:
+        rows = get_restaurants_by_category(category_th)
+        if not rows:
+            _reply(api, event, [_text(f"ยังไม่มีข้อมูล{category_th}ค่ะ 🙏")])
+            return
+        names = [r["name"] for r in rows]
+        _reply(api, event, [TextMessage(
+            text=f"🍴 {category_th} ในท่ายาง\n\n" + "\n".join(f"• {n}" for n in names) + "\n\n👆 กดเลือกร้านที่สนใจได้เลยค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label=n[:20], text=f"ร้าน {n}"))
+                for n in names[:13]
+            ])
+        )])
+    except Exception as e:
+        print(f"[FOOD MENU ERROR] {e}")
+        _reply(api, event, [_text("ขอโทษค่ะ เกิดข้อผิดพลาด ลองใหม่นะคะ 🙏")])
+
+
+def send_restaurant_detail_by_name(api, event, name: str):
+    """แสดงรายละเอียดร้านจากชื่อ"""
+    try:
+        row = get_restaurant_detail(name)
+        if not row:
+            _reply(api, event, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลร้าน {name} ค่ะ")])
+            return
+        bubbles = [_flex_restaurant_bubble(
+            row["name"], row.get("highlight"), row.get("cover_image"),
+            row.get("open_hours"), row.get("close_hours"), row.get("map_url")
+        )]
+        _send_flex_carousel(api, event, row["name"], bubbles)
+    except Exception as e:
+        print(f"[REST DETAIL ERROR] {e}")
+        _reply(api, event, [_text("ขอโทษค่ะ เกิดข้อผิดพลาด ลองใหม่นะคะ 🙏")])
+
 
 # =========================
 # 🕐 TIME HELPERS
@@ -663,20 +682,13 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif text in ["info", "เกี่ยวกับเรา"]:
                 send_info(api, event)
 
-            elif text.startswith("หมวดอาหาร "):
-                send_food_category_list(api, event, text.replace("หมวดอาหาร ", "", 1))
+            elif text.startswith("ร้าน "):
+                rname = text[len("ร้าน "):]
+                send_restaurant_detail_by_name(api, event, rname)
 
-            elif text.startswith("เมนู "):
-                rest = text[len("เมนู "):]
-                matched_cat = matched_name = None
-                for cat in food:
-                    if rest.startswith(cat + " "):
-                        matched_cat, matched_name = cat, rest[len(cat) + 1:]
-                        break
-                if matched_cat and matched_name in food[matched_cat]:
-                    send_food_detail(api, event, matched_cat, matched_name)
-                else:
-                    _reply(api, event, [_text("ขอโทษค่ะ ไม่พบข้อมูลเมนูนี้ค่ะ")])
+            elif text.startswith("หมวด "):
+                cat = text[len("หมวด "):]
+                send_food_menu_list(api, event, cat)
 
             elif text.startswith("ของฝาก "):
                 name = text.replace("ของฝาก ", "", 1)
