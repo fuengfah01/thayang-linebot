@@ -1,11 +1,7 @@
-print("=== APP STARTING ===")
-
 from flask import Flask, request, send_from_directory, jsonify
-# ... imports อื่นๆ ...
 
 print("=== IMPORTS OK ===")
 
-from flask import Flask, request, send_from_directory, jsonify
 from linebot.v3.messaging import (
     ApiClient, Configuration, MessagingApi,
     ReplyMessageRequest, PushMessageRequest,
