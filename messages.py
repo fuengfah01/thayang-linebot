@@ -1,14 +1,20 @@
 # flex/messages.py — ใช้ map_url แทน lat/lng
+from urllib.parse import quote
 
 def _map_uri(obj):
     """ดึง map_url ถ้ามี ไม่มีใช้ lat/lng fallback"""
-    if obj.get("map_url"):
-        return obj["map_url"]
+    url = obj.get("map_url") or obj.get("map") or ""
+    if url and url.startswith("http"):
+        # encode Thai characters in query string only, keep structure intact
+        if "q=" in url:
+            base, q = url.split("q=", 1)
+            return base + "q=" + quote(q, safe=",+&")
+        return url
     lat = obj.get("lat", "")
     lng = obj.get("lng", "")
     if lat and lng:
         return f"https://maps.google.com/?q={lat},{lng}"
-    return "https://maps.google.com/?q=ท่ายาง+เพชรบุรี"
+    return "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
 
 
 def place_bubble(p):
