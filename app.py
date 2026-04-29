@@ -368,33 +368,36 @@ def send_places(api, event):
 
 
 def send_restaurants(api, event):
-    """ถามก่อนว่าจะกินคาวหรือหวาน"""
     quick_reply = QuickReply(items=[
         QuickReplyItem(action=MessageAction(label="🍜 อาหารคาว", text="ร้านอาหารคาว")),
         QuickReplyItem(action=MessageAction(label="🍮 อาหารหวาน", text="ร้านอาหารหวาน")),
     ])
-    msg = TextMessage(text="อยากกินอะไรดีคะ? 😊\nเลือกประเภทอาหารได้เลยค่ะ", quick_reply=quick_reply)
+    msg = TextMessage(
+        text="อยากกินอะไรดีคะ? 😊\nเลือกประเภทอาหารได้เลยค่ะ",
+        quick_reply=quick_reply
+    )
     try:
-        _reply(api, event, [msg])
+        api.reply_message(
+            ReplyMessageRequest(reply_token=event.reply_token, messages=[msg])
+        )
     except Exception as e:
         print(f"[REST ERROR] quick reply: {e}")
         import traceback; traceback.print_exc()
 
 
-def send_restaurants_by_category(api, event, category_th: str):
-    """โหลดร้านอาหารตาม category แล้วส่ง carousel"""
+def send_restaurants_by_category(api, event, category: str):  # ✅ category
     try:
-        print(f"[FOOD] send_restaurants_by_category called: category={repr(category_th)}")
-        rows = get_restaurants_by_category(category_th)
+        print(f"[FOOD] send_restaurants_by_category called: category={repr(category)}")  # ✅
+        rows = get_restaurants_by_category(category)  # ✅
         print(f"[FOOD] DB returned {len(rows)} rows")
         if not rows:
-            _reply(api, event, [_text(f"ยังไม่มีข้อมูลร้าน{category_th}ค่ะ 🙏")])
+            _reply(api, event, [_text(f"ยังไม่มีข้อมูลร้าน{category}ค่ะ 🙏")])  # ✅
             return
         bubbles = [_flex_restaurant_bubble(
             r["name"], r.get("highlight"), r.get("cover_image"),
             r.get("open_hours"), r.get("close_hours"), r.get("map_url")
         ) for r in rows]
-        label = "อาหารคาว 🍜" if category_th == "อาหารคาว" else "อาหารหวาน 🍮"
+        label = "อาหารคาว 🍜" if category == "อาหารคาว" else "อาหารหวาน 🍮"  # ✅
         _send_flex_carousel(api, event, f"ร้าน{label}ในท่ายาง", bubbles)
     except Exception as e:
         print(f"[REST ERROR] {e}")
