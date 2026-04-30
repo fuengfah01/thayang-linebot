@@ -391,7 +391,19 @@ def send_place_detail(api, event, name):
 
 
 def send_places(api, event):
+    """ถามก่อนว่าต้องการสถานที่เที่ยว หรือสถานที่กิน"""
     user_id = event.source.user_id
+    _push(api, user_id, [TextMessage(
+        text="อยากดูสถานที่ประเภทไหนคะ? 😊",
+        quick_reply=QuickReply(items=[
+            QuickReplyItem(action=MessageAction(label="🏛️ สถานที่เที่ยว", text="สถานที่เที่ยว")),
+            QuickReplyItem(action=MessageAction(label="🍽️ สถานที่กิน",    text="สถานที่กิน")),
+        ])
+    )])
+
+
+def send_travel_places(api, user_id: str):
+    """แสดงสถานที่ท่องเที่ยว (travel) จาก DB"""
     rows = get_places_by_category("travel")
     if not rows:
         _push(api, user_id, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
@@ -401,6 +413,19 @@ def send_places(api, event):
         r.get("open_time"), r.get("close_time"), r.get("map_url")
     ) for r in rows]
     _send_flex_carousel(api, user_id, "สถานที่ท่องเที่ยวในท่ายาง", bubbles)
+
+
+def send_eat_places(api, user_id: str):
+    """แสดงสถานที่กิน (eat) จาก DB"""
+    rows = get_places_by_category("eat")
+    if not rows:
+        _push(api, user_id, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่กินค่ะ")])
+        return
+    bubbles = [_flex_place_bubble(
+        r["place_name"], r.get("highlight"), r.get("cover_image"),
+        r.get("open_time"), r.get("close_time"), r.get("map_url")
+    ) for r in rows]
+    _send_flex_carousel(api, user_id, "สถานที่กินในท่ายาง", bubbles)
 
 
 def send_restaurants(api, event):
@@ -754,6 +779,12 @@ def _process_message(reply_token: str, text: str, user_id: str):
             # ── เมนูหลัก ──
             elif t in ["travel", "สถานที่ท่องเที่ยว"]:
                 send_places(api, event)
+
+            elif t in ["สถานที่เที่ยว", "ที่เที่ยว"]:
+                send_travel_places(api, user_id)
+
+            elif t in ["สถานที่กิน", "ที่กิน"]:
+                send_eat_places(api, user_id)
 
             elif t in ["food", "ร้านอาหาร", "ร้านอาหารในอำเภอท่ายาง", "อาหาร", "กินอะไรดี", "อาหารแนะนำ"]:
                 send_restaurants(api, event)
