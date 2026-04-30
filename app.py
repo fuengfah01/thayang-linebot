@@ -253,59 +253,67 @@ def home():
 # =========================
 # 🍽 RESTAURANT LIST + DETAIL
 # =========================
+QR_PAGE = 12  # Quick Reply ต่อหน้า (เหลือ 1 slot ไว้ปุ่ม "ถัดไป")
 
-def send_restaurants_by_category(api, event, category: str, offset: int = 0):
+
+def send_restaurants_by_category(api, event, category: str, qr_offset: int = 0):
     """
-    ขั้นที่ 1: ส่งรายชื่อร้านทั้งหมดเป็น text + Quick Reply ให้กดเลือก
-    กดชื่อร้านแล้ว → send_restaurant_detail_by_name ส่ง bubble ออกมา
+    ส่งรายชื่อร้านทั้งหมดในข้อความเดียว
+    Quick Reply แสดงทีละ 12 ร้าน + ปุ่ม "ร้านถัดไป →" ถ้ามีเพิ่ม
+    กดชื่อร้าน → send_restaurant_detail_by_name ส่ง Flex bubble
     """
     user_id = event.source.user_id
     try:
         rows = get_restaurants_by_category(category, limit=50, offset=0)
-        print(f"[FOOD] category={repr(category)} got={len(rows)}")
+        print(f"[FOOD] category={repr(category)} total={len(rows)} qr_offset={qr_offset}")
 
         if not rows:
             _push(api, user_id, [_text(f"ยังไม่มีข้อมูลร้าน{category}ค่ะ 🙏")])
             return
 
         label = "อาหารคาว 🍜" if category == "อาหารคาว" else "อาหารหวาน 🍮"
+        total = len(rows)
 
-        # สร้างข้อความรายชื่อร้านทั้งหมด
-        name_list = "\n".join(f"{i}. {r['name']}" for i, r in enumerate(rows, 1))
-        msg_text = (
-            f"🍽️ ร้าน{label}ในท่ายาง ({len(rows)} ร้าน)\n\n"
-            f"{name_list}\n\n"
-            f"👇 กดชื่อร้านเพื่อดูรายละเอียดค่ะ"
-        )
+        # ── ข้อความรายชื่อร้านทั้งหมด (ส่งครั้งเดียว ไม่ซ้ำ) ──
+        if qr_offset == 0:
+            name_list = "\n".join(f"{i}. {r['name']}" for i, r in enumerate(rows, 1))
+            msg_text = (
+                f"🍽️ ร้าน{label}ในท่ายาง ({total} ร้าน)\n\n"
+                f"{name_list}\n\n"
+                f"👇 กดชื่อร้านเพื่อดูรายละเอียดค่ะ"
+            )
+            _push(api, user_id, [_text(msg_text)])
 
-        # Quick Reply ทีละ 13 ชื่อ (LINE limit)
+        # ── Quick Reply ชุดปัจจุบัน ──
+        chunk = rows[qr_offset: qr_offset + QR_PAGE]
+        has_more = (qr_offset + QR_PAGE) < total
+
         quick_items = [
             QuickReplyItem(action=MessageAction(
                 label=r["name"][:20],
                 text=f"ร้าน {r['name']}"
             ))
-            for r in rows[:13]
+            for r in chunk
         ]
 
-        _push(api, user_id, [
-            TextMessage(text=msg_text, quick_reply=QuickReply(items=quick_items))
-        ])
-
-        # ถ้ามีร้านเกิน 13 → ส่ง Quick Reply ชุดที่ 2
-        if len(rows) > 13:
-            quick_items_2 = [
+        # ถ้ายังมีร้านหน้าถัดไป → ใส่ปุ่ม "ร้านถัดไป →" ต่อท้าย
+        if has_more:
+            next_offset = qr_offset + QR_PAGE
+            remaining = total - next_offset
+            quick_items.append(
                 QuickReplyItem(action=MessageAction(
-                    label=r["name"][:20],
-                    text=f"ร้าน {r['name']}"
+                    label=f"ร้านถัดไป ({remaining}) →",
+                    text=f"ร้านถัดไป:{category}:{next_offset}"
                 ))
-                for r in rows[13:26]
-            ]
-            _push(api, user_id, [
-                TextMessage(
-                    text="📋 ร้านที่เหลือ กดเลือกได้เลยค่ะ 👇",
-                    quick_reply=QuickReply(items=quick_items_2)
-                )
-            ])
+            )
+
+        start_num = qr_offset + 1
+        end_num = qr_offset + len(chunk)
+        qr_text = f"📋 ร้านที่ {start_num}–{end_num} กดเลือกได้เลยค่ะ 👇"
+
+        _push(api, user_id, [
+            TextMessage(text=qr_text, quick_reply=QuickReply(items=quick_items))
+        ])
 
     except Exception as e:
         print(f"[REST ERROR] {e}")
@@ -812,6 +820,19 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t in ["อาหารหวาน", "ร้านอาหารหวาน", "หวาน"]:
                 print(f"[ROUTE] matched อาหารหวาน")
                 send_restaurants_by_category(api, event, "อาหารหวาน")
+
+            # ── Quick Reply ร้านถัดไป ──
+            elif t.startswith("ร้านถัดไป:"):
+                # format: "ร้านถัดไป:อาหารคาว:12"
+                parts = t.split(":")
+                if len(parts) == 3:
+                    _, cat, off = parts
+                    try:
+                        send_restaurants_by_category(api, event, cat, int(off))
+                    except ValueError:
+                        _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
+                else:
+                    _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
 
             elif t in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
