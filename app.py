@@ -11,8 +11,8 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from db import (
     search_place, get_places_by_category, get_all_place_names,
-    get_restaurants_by_category, get_all_souvenirs, get_about,
-    get_restaurant_detail
+    get_restaurants_by_category, count_restaurants_by_category,
+    get_all_souvenirs, get_about, get_restaurant_detail
 )
 from places import places
 from ai_helper import ask_ai
@@ -27,13 +27,8 @@ from urllib.parse import quote
 
 FALLBACK_MAP = "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
 
-# =========================
-# 📄 PAGINATION CONFIG
-# =========================
-PAGE_SIZE = 10  # จำนวน bubble ต่อหน้า (LINE จำกัด 10 per carousel)
-
-
 def _safe_uri(url: str) -> str:
+    """แปลง map_url ให้ปลอดภัยสำหรับ LINE button URI"""
     if not url or not isinstance(url, str):
         return FALLBACK_MAP
     url = url.strip()
@@ -116,6 +111,7 @@ souvenirs = {
 # 🛠 HELPERS
 # =========================
 def _push(api, user_id: str, messages: list):
+    """Push message โดยตรงด้วย user_id"""
     try:
         api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
     except Exception as e:
@@ -124,6 +120,7 @@ def _push(api, user_id: str, messages: list):
 
 
 def _reply(api, event, messages: list):
+    """พยายาม push ก่อน ถ้าไม่ได้ค่อย reply"""
     try:
         user_id = event.source.user_id
         api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
@@ -231,81 +228,13 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
     return bubble
 
 
-def _make_next_page_bubble(label: str, next_cmd: str) -> dict:
-    """สร้าง bubble พิเศษสำหรับปุ่ม 'ดูเพิ่มเติม'"""
-    return {
-        "type": "bubble",
-        "size": "kilo",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "justifyContent": "center",
-            "alignItems": "center",
-            "paddingAll": "24px",
-            "contents": [
-                {"type": "text", "text": "📋", "size": "xxl", "align": "center"},
-                {"type": "text", "text": label, "weight": "bold", "size": "md",
-                 "align": "center", "wrap": True, "margin": "md", "color": "#1a1a2e"},
-                {"type": "text", "text": "กดเพื่อดูรายการถัดไป", "size": "sm",
-                 "align": "center", "color": "#888888", "margin": "sm"},
-            ]
-        },
-        "footer": {
-            "type": "box", "layout": "vertical", "paddingAll": "12px",
-            "contents": [{
-                "type": "button", "style": "primary", "color": "#0369a1",
-                "action": {"type": "message", "label": "➡ ดูเพิ่มเติม", "text": next_cmd}
-            }]
-        }
-    }
-
-
 def _send_flex_carousel(api, user_id: str, alt_text: str, bubbles: list):
-    """ส่ง flex carousel ด้วย push_message — จำกัด 10 bubble ต่อครั้ง (LINE limit)"""
-    bubbles = [b for b in bubbles if b][:10]
+    """ส่ง flex carousel ด้วย push_message โดยตรง"""
+    bubbles = [b for b in bubbles if b][:12]
     if not bubbles:
         return
     container = bubbles[0] if len(bubbles) == 1 else {"type": "carousel", "contents": bubbles}
     _push(api, user_id, [FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(container))])
-
-
-def _send_paginated_carousel(api, user_id: str, alt_text: str, bubbles: list,
-                              page: int, next_cmd: str):
-    """
-    ส่ง carousel แบบแบ่งหน้า
-    - หน้าละ PAGE_SIZE (10) bubble
-    - ถ้ายังมีหน้าถัดไป จะเพิ่ม bubble "ดูเพิ่มเติม" ต่อท้าย (รวมสูงสุด 10 bubble)
-    - page เริ่มที่ 0
-    """
-    all_bubbles = [b for b in bubbles if b]
-    total = len(all_bubbles)
-    start = page * PAGE_SIZE
-    end   = start + PAGE_SIZE
-    has_next = end < total
-
-    if has_next:
-        # แสดง 9 bubble + 1 bubble "ดูเพิ่มเติม"
-        page_bubbles = all_bubbles[start:start + (PAGE_SIZE - 1)]
-        remaining = total - (start + PAGE_SIZE - 1)
-        page_bubbles.append(_make_next_page_bubble(
-            f"มีอีก {remaining} รายการ", next_cmd
-        ))
-    else:
-        page_bubbles = all_bubbles[start:end]
-
-    if not page_bubbles:
-        _push(api, user_id, [_text("ไม่พบข้อมูลค่ะ")])
-        return
-
-    page_num = page + 1
-    total_pages = (total + PAGE_SIZE - 2) // (PAGE_SIZE - 1) if total > PAGE_SIZE else 1
-    header_text = f"{alt_text} (หน้า {page_num}/{total_pages})" if total > PAGE_SIZE - 1 else alt_text
-
-    container = page_bubbles[0] if len(page_bubbles) == 1 else {"type": "carousel", "contents": page_bubbles}
-    _push(api, user_id, [FlexMessage(
-        alt_text=header_text,
-        contents=FlexContainer.from_dict(container)
-    )])
 
 
 # =========================
@@ -319,6 +248,111 @@ def serve_image(filename):
 @app.route("/")
 def home():
     return "LINE BOT RUNNING ✅"
+
+
+# =========================
+# 🍽 PAGINATION — ร้านอาหาร
+# =========================
+PAGE_SIZE = 6  # จำนวน bubble ต่อหน้า (max 11 + 1 see-more = 12)
+
+
+def _flex_see_more_bubble(category: str, next_offset: int, remaining: int) -> dict:
+    """Bubble สุดท้ายแสดงปุ่ม 'ดูเพิ่มเติม' พร้อมจำนวนร้านที่เหลือ"""
+    return {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "justifyContent": "center",
+            "alignItems": "center",
+            "height": "160px",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"มีร้านอีก {remaining} ร้านค่ะ 🍽️",
+                    "size": "md",
+                    "color": "#888888",
+                    "align": "center",
+                    "wrap": True,
+                },
+                {
+                    "type": "text",
+                    "text": "กดปุ่มด้านล่างเพื่อดูเพิ่มเติมค่ะ 😊",
+                    "size": "sm",
+                    "color": "#aaaaaa",
+                    "align": "center",
+                    "margin": "sm",
+                    "wrap": True,
+                },
+            ],
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "12px",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": "#d97706",
+                    "action": {
+                        "type": "message",
+                        "label": f"ดูเพิ่มเติม {remaining} ร้าน →",
+                        "text": f"ดูเพิ่ม:{category}:{next_offset}",
+                    },
+                }
+            ],
+        },
+    }
+
+
+def send_restaurants_by_category(api, event, category: str, offset: int = 0):
+    """
+    ดึงร้านจาก DB ตาม category แล้วส่งเป็น flex carousel
+    รองรับ pagination ด้วย offset + bubble 'ดูเพิ่มเติม'
+    """
+    user_id = event.source.user_id
+    try:
+        total = count_restaurants_by_category(category)
+        rows = get_restaurants_by_category(category, limit=PAGE_SIZE, offset=offset)
+        print(f"[FOOD] category={repr(category)} offset={offset} total={total} got={len(rows)}")
+
+        if not rows:
+            _push(api, user_id, [_text(f"ยังไม่มีข้อมูลร้าน{category}ค่ะ 🙏")])
+            return
+
+        bubbles = [
+            _flex_restaurant_bubble(
+                r["name"], r.get("highlight"), r.get("cover_image"),
+                r.get("open_hours"), r.get("close_hours"), r.get("map_url")
+            )
+            for r in rows
+        ]
+
+        next_offset = offset + PAGE_SIZE
+        remaining = total - next_offset
+
+        # ถ้ายังมีร้านเหลืออยู่ → ต่อ bubble "ดูเพิ่มเติม"
+        if remaining > 0:
+            bubbles.append(_flex_see_more_bubble(category, next_offset, remaining))
+
+        label = "อาหารคาว 🍜" if category == "อาหารคาว" else "อาหารหวาน 🍮"
+        container = (
+            bubbles[0] if len(bubbles) == 1
+            else {"type": "carousel", "contents": bubbles}
+        )
+
+        _push(api, user_id, [
+            FlexMessage(
+                alt_text=f"ร้าน{label}ในท่ายาง",
+                contents=FlexContainer.from_dict(container)
+            )
+        ])
+
+    except Exception as e:
+        print(f"[REST ERROR] {e}")
+        import traceback; traceback.print_exc()
+        _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาด ลองใหม่อีกครั้งนะคะ 🙏")])
 
 
 # =========================
@@ -465,8 +499,7 @@ def send_places(api, event):
     )])
 
 
-def send_travel_places(api, user_id: str, page: int = 0):
-    """แสดงสถานที่ท่องเที่ยว (travel) แบบ pagination"""
+def send_travel_places(api, user_id: str):
     rows = get_places_by_category("travel")
     if not rows:
         _push(api, user_id, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่ค่ะ")])
@@ -475,14 +508,10 @@ def send_travel_places(api, user_id: str, page: int = 0):
         r["place_name"], r.get("highlight"), r.get("cover_image"),
         r.get("open_time"), r.get("close_time"), r.get("map_url")
     ) for r in rows]
-    _send_paginated_carousel(
-        api, user_id, "สถานที่ท่องเที่ยวในท่ายาง", bubbles,
-        page=page, next_cmd=f"สถานที่เที่ยว_หน้า_{page + 1}"
-    )
+    _send_flex_carousel(api, user_id, "สถานที่ท่องเที่ยวในท่ายาง", bubbles)
 
 
-def send_eat_places(api, user_id: str, page: int = 0):
-    """แสดงสถานที่กิน (eat) แบบ pagination"""
+def send_eat_places(api, user_id: str):
     rows = get_places_by_category("eat")
     if not rows:
         _push(api, user_id, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลสถานที่กินค่ะ")])
@@ -491,10 +520,7 @@ def send_eat_places(api, user_id: str, page: int = 0):
         r["place_name"], r.get("highlight"), r.get("cover_image"),
         r.get("open_time"), r.get("close_time"), r.get("map_url")
     ) for r in rows]
-    _send_paginated_carousel(
-        api, user_id, "สถานที่กินในท่ายาง", bubbles,
-        page=page, next_cmd=f"สถานที่กิน_หน้า_{page + 1}"
-    )
+    _send_flex_carousel(api, user_id, "สถานที่กินในท่ายาง", bubbles)
 
 
 def send_restaurants(api, event):
@@ -515,40 +541,7 @@ def send_restaurants(api, event):
         import traceback; traceback.print_exc()
 
 
-def send_restaurants_by_category(api, event, category: str, page: int = 0):
-    """
-    ดึงร้านจาก DB ตาม category แล้วส่งเป็น flex carousel แบบ pagination
-    """
-    user_id = event.source.user_id
-    try:
-        print(f"[FOOD] send_restaurants_by_category called: category={repr(category)} page={page}")
-        rows = get_restaurants_by_category(category)
-        print(f"[FOOD] DB returned {len(rows)} rows")
-
-        if not rows:
-            _push(api, user_id, [_text(f"ยังไม่มีข้อมูลร้าน{category}ค่ะ 🙏")])
-            return
-
-        bubbles = [_flex_restaurant_bubble(
-            r["name"], r.get("highlight"), r.get("cover_image"),
-            r.get("open_hours"), r.get("close_hours"), r.get("map_url")
-        ) for r in rows]
-
-        label = "อาหารคาว 🍜" if category == "อาหารคาว" else "อาหารหวาน 🍮"
-        next_cmd = f"{category}_หน้า_{page + 1}"
-
-        _send_paginated_carousel(
-            api, user_id, f"ร้าน{label}ในท่ายาง", bubbles,
-            page=page, next_cmd=next_cmd
-        )
-
-    except Exception as e:
-        print(f"[REST ERROR] {e}")
-        import traceback; traceback.print_exc()
-        _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาด ลองใหม่อีกครั้งนะคะ 🙏")])
-
-
-def send_souvenirs(api, event, page: int = 0):
+def send_souvenirs(api, event):
     user_id = event.source.user_id
     rows = get_all_souvenirs()
     if not rows:
@@ -588,11 +581,7 @@ def send_souvenirs(api, event, page: int = 0):
                 "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
             }
         bubbles.append(bubble)
-
-    _send_paginated_carousel(
-        api, user_id, "ของฝากในท่ายาง", bubbles,
-        page=page, next_cmd=f"ของฝาก_หน้า_{page + 1}"
-    )
+    _send_flex_carousel(api, user_id, "ของฝากในท่ายาง", bubbles)
 
 
 def send_map(api, event):
@@ -849,50 +838,10 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 send_places(api, event)
 
             elif t in ["สถานที่เที่ยว", "ที่เที่ยว"]:
-                send_travel_places(api, user_id, page=0)
+                send_travel_places(api, user_id)
 
             elif t in ["สถานที่กิน", "ที่กิน"]:
-                send_eat_places(api, user_id, page=0)
-
-            # ── Pagination commands สถานที่เที่ยว ──
-            elif t.startswith("สถานที่เที่ยว_หน้า_"):
-                try:
-                    page = int(t.split("_หน้า_")[1])
-                    send_travel_places(api, user_id, page=page)
-                except (IndexError, ValueError):
-                    send_travel_places(api, user_id, page=0)
-
-            # ── Pagination commands สถานที่กิน ──
-            elif t.startswith("สถานที่กิน_หน้า_"):
-                try:
-                    page = int(t.split("_หน้า_")[1])
-                    send_eat_places(api, user_id, page=page)
-                except (IndexError, ValueError):
-                    send_eat_places(api, user_id, page=0)
-
-            # ── Pagination commands อาหารคาว ──
-            elif t.startswith("อาหารคาว_หน้า_"):
-                try:
-                    page = int(t.split("_หน้า_")[1])
-                    send_restaurants_by_category(api, event, "อาหารคาว", page=page)
-                except (IndexError, ValueError):
-                    send_restaurants_by_category(api, event, "อาหารคาว", page=0)
-
-            # ── Pagination commands อาหารหวาน ──
-            elif t.startswith("อาหารหวาน_หน้า_"):
-                try:
-                    page = int(t.split("_หน้า_")[1])
-                    send_restaurants_by_category(api, event, "อาหารหวาน", page=page)
-                except (IndexError, ValueError):
-                    send_restaurants_by_category(api, event, "อาหารหวาน", page=0)
-
-            # ── Pagination commands ของฝาก ──
-            elif t.startswith("ของฝาก_หน้า_"):
-                try:
-                    page = int(t.split("_หน้า_")[1])
-                    send_souvenirs(api, event, page=page)
-                except (IndexError, ValueError):
-                    send_souvenirs(api, event, page=0)
+                send_eat_places(api, user_id)
 
             elif t in ["food", "ร้านอาหาร", "ร้านอาหารในอำเภอท่ายาง", "อาหาร", "กินอะไรดี", "อาหารแนะนำ"]:
                 send_restaurants(api, event)
@@ -900,11 +849,24 @@ def _process_message(reply_token: str, text: str, user_id: str):
             # ── อาหารคาว / อาหารหวาน ──
             elif t in ["อาหารคาว", "ร้านอาหารคาว", "คาว"]:
                 print(f"[ROUTE] matched อาหารคาว")
-                send_restaurants_by_category(api, event, "อาหารคาว", page=0)
+                send_restaurants_by_category(api, event, "อาหารคาว")
 
             elif t in ["อาหารหวาน", "ร้านอาหารหวาน", "หวาน"]:
                 print(f"[ROUTE] matched อาหารหวาน")
-                send_restaurants_by_category(api, event, "อาหารหวาน", page=0)
+                send_restaurants_by_category(api, event, "อาหารหวาน")
+
+            # ── pagination ร้านอาหาร (กดปุ่ม "ดูเพิ่มเติม") ──
+            elif t.startswith("ดูเพิ่ม:"):
+                # format: "ดูเพิ่ม:อาหารคาว:6"
+                parts = t.split(":")
+                if len(parts) == 3:
+                    _, cat, off = parts
+                    try:
+                        send_restaurants_by_category(api, event, cat, int(off))
+                    except ValueError:
+                        _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
+                else:
+                    _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
 
             elif t in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
@@ -913,7 +875,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 send_map(api, event)
 
             elif t in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
-                send_souvenirs(api, event, page=0)
+                send_souvenirs(api, event)
 
             elif t in ["info", "เกี่ยวกับเรา"]:
                 send_info(api, event)
