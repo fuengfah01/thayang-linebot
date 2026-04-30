@@ -25,20 +25,36 @@ import requests as req
 from urllib.parse import quote
 
 
+FALLBACK_MAP = "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
+
 def _safe_uri(url: str) -> str:
-    if not url:
-        return "https://www.google.com/maps/search/?api=1&query=Tha+Yang+Phetchaburi"
-    if "?" not in url:
-        return url
-    base, qs = url.split("?", 1)
-    parts = []
-    for param in qs.split("&"):
-        if "=" in param:
-            k, v = param.split("=", 1)
-            parts.append(k + "=" + quote(v.replace("+", " "), safe=""))
-        else:
-            parts.append(param)
-    return base + "?" + "&".join(parts)
+    """แปลง map_url ให้ปลอดภัยสำหรับ LINE button URI
+    - ถ้าว่างหรือ None → fallback
+    - ถ้าไม่ขึ้นต้น https:// → fallback
+    - encode ค่าภาษาไทยใน query string
+    """
+    if not url or not isinstance(url, str):
+        return FALLBACK_MAP
+    url = url.strip()
+    if not url.startswith("https://") and not url.startswith("http://"):
+        return FALLBACK_MAP
+    try:
+        if "?" not in url:
+            return url
+        base, qs = url.split("?", 1)
+        parts = []
+        for param in qs.split("&"):
+            if "=" in param:
+                k, v = param.split("=", 1)
+                parts.append(k + "=" + quote(v.replace("+", " "), safe=""))
+            else:
+                parts.append(param)
+        result = base + "?" + "&".join(parts)
+        # ตรวจสอบขั้นสุดท้าย ถ้ายังมีอักขระแปลก → fallback
+        result.encode("ascii")
+        return result
+    except Exception:
+        return FALLBACK_MAP
 
 
 app = Flask(__name__)
@@ -178,21 +194,21 @@ def _flex_restaurant_bubble(name, highlight, image_url, open_hours, close_hours,
             "size": "sm", "color": "#777777", "margin": "md"
         })
 
-    footer_contents = []
-    if map_url:
-        footer_contents.append({
-            "type": "button", "style": "primary", "color": "#d97706", "height": "sm",
-            "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}
-        })
+
+    # ✅ ใส่ footer เสมอ โดยใช้ _safe_uri ที่มี fallback ป้องกัน Invalid action URI
+    safe_map = _safe_uri(map_url)
+    footer_contents = [{
+        "type": "button", "style": "primary", "color": "#d97706", "height": "sm",
+        "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": safe_map}
+    }]
 
     bubble = {
         "type": "bubble",
-        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"}
+        "body": {"type": "box", "layout": "vertical", "contents": body_contents, "paddingAll": "16px"},
+        "footer": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_contents, "paddingAll": "12px"}
     }
     if image_url:
         bubble["hero"] = {"type": "image", "url": image_url, "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"}
-    if footer_contents:
-        bubble["footer"] = {"type": "box", "layout": "vertical", "spacing": "sm", "contents": footer_contents, "paddingAll": "12px"}
     return bubble
 
 
