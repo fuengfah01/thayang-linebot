@@ -253,66 +253,164 @@ def home():
 # =========================
 # 🍽 RESTAURANT LIST + DETAIL
 # =========================
-QR_PAGE = 12  # Quick Reply ต่อหน้า (เหลือ 1 slot ไว้ปุ่ม "ถัดไป")
+PAGE_SIZE = 8  # จำนวนร้านต่อหน้า
 
 
-def send_restaurants_by_category(api, event, category: str, qr_offset: int = 0):
+def send_restaurants_by_category(api, event, category: str, offset: int = 0):
     """
-    ส่งรายชื่อร้านทั้งหมดในข้อความเดียว
-    Quick Reply แสดงทีละ 12 ร้าน + ปุ่ม "ร้านถัดไป →" ถ้ามีเพิ่ม
-    กดชื่อร้าน → send_restaurant_detail_by_name ส่ง Flex bubble
+    ส่ง Flex Bubble รายชื่อร้านพร้อมปุ่ม ◀ ก่อนหน้า / ถัดไป ▶
+    กดชื่อร้าน → ส่ง message "ร้าน {name}" → send_restaurant_detail_by_name
     """
     user_id = event.source.user_id
     try:
         rows = get_restaurants_by_category(category, limit=50, offset=0)
-        print(f"[FOOD] category={repr(category)} total={len(rows)} qr_offset={qr_offset}")
+        print(f"[FOOD] category={repr(category)} total={len(rows)} offset={offset}")
 
         if not rows:
             _push(api, user_id, [_text(f"ยังไม่มีข้อมูลร้าน{category}ค่ะ 🙏")])
             return
 
-        label = "อาหารคาว 🍜" if category == "อาหารคาว" else "อาหารหวาน 🍮"
         total = len(rows)
+        chunk = rows[offset: offset + PAGE_SIZE]
+        has_prev = offset > 0
+        has_next = (offset + PAGE_SIZE) < total
+        current_page = (offset // PAGE_SIZE) + 1
+        total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
 
-        # ── ข้อความรายชื่อร้านทั้งหมด (ส่งครั้งเดียว ไม่ซ้ำ) ──
-        if qr_offset == 0:
-            name_list = "\n".join(f"{i}. {r['name']}" for i, r in enumerate(rows, 1))
-            msg_text = (
-                f"🍽️ ร้าน{label}ในท่ายาง ({total} ร้าน)\n\n"
-                f"{name_list}\n\n"
-                f"👇 กดชื่อร้านเพื่อดูรายละเอียดค่ะ"
-            )
-            _push(api, user_id, [_text(msg_text)])
+        label_emoji = "🍜" if category == "อาหารคาว" else "🍮"
 
-        # ── Quick Reply ชุดปัจจุบัน ──
-        chunk = rows[qr_offset: qr_offset + QR_PAGE]
-        has_more = (qr_offset + QR_PAGE) < total
+        # ── header ──
+        header = {
+            "type": "box",
+            "layout": "vertical",
+            "backgroundColor": "#d97706",
+            "paddingAll": "14px",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": f"{label_emoji} ร้าน{category}",
+                    "color": "#ffffff",
+                    "weight": "bold",
+                    "size": "lg"
+                },
+                {
+                    "type": "text",
+                    "text": f"หน้า {current_page}/{total_pages}  ({total} ร้าน)",
+                    "color": "#ffe4b2",
+                    "size": "xs",
+                    "margin": "xs"
+                }
+            ]
+        }
 
-        quick_items = [
-            QuickReplyItem(action=MessageAction(
-                label=r["name"][:20],
-                text=f"ร้าน {r['name']}"
-            ))
-            for r in chunk
-        ]
+        # ── body — รายชื่อร้าน ──
+        shop_rows = []
+        for i, r in enumerate(chunk, start=offset + 1):
+            shop_rows.append({
+                "type": "box",
+                "layout": "horizontal",
+                "paddingAll": "8px",
+                "backgroundColor": "#ffffff" if i % 2 != 0 else "#fef9f0",
+                "action": {"type": "message", "text": f"ร้าน {r['name']}"},
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": str(i),
+                        "size": "sm",
+                        "color": "#d97706",
+                        "weight": "bold",
+                        "flex": 0
+                    },
+                    {
+                        "type": "text",
+                        "text": f"  {r['name']}",
+                        "size": "sm",
+                        "color": "#1a1a2e",
+                        "wrap": True,
+                        "flex": 1
+                    },
+                    {
+                        "type": "text",
+                        "text": "›",
+                        "size": "md",
+                        "color": "#d97706",
+                        "flex": 0,
+                        "align": "end"
+                    }
+                ]
+            })
+            if i - offset < len(chunk):
+                shop_rows.append({"type": "separator", "color": "#f0e6d3"})
 
-        # ถ้ายังมีร้านหน้าถัดไป → ใส่ปุ่ม "ร้านถัดไป →" ต่อท้าย
-        if has_more:
-            next_offset = qr_offset + QR_PAGE
-            remaining = total - next_offset
-            quick_items.append(
-                QuickReplyItem(action=MessageAction(
-                    label=f"ร้านถัดไป ({remaining}) →",
-                    text=f"ร้านถัดไป:{category}:{next_offset}"
-                ))
-            )
+        body = {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "0px",
+            "contents": shop_rows
+        }
 
-        start_num = qr_offset + 1
-        end_num = qr_offset + len(chunk)
-        qr_text = f"📋 ร้านที่ {start_num}–{end_num} กดเลือกได้เลยค่ะ 👇"
+        # ── footer — ปุ่ม ◀ / ▶ ──
+        nav_buttons = []
+
+        if has_prev:
+            nav_buttons.append({
+                "type": "button",
+                "style": "secondary",
+                "height": "sm",
+                "flex": 1,
+                "action": {
+                    "type": "message",
+                    "label": "◀ ก่อนหน้า",
+                    "text": f"ร้านก่อนหน้า:{category}:{offset - PAGE_SIZE}"
+                }
+            })
+
+        if has_prev and has_next:
+            nav_buttons.append({"type": "separator"})
+
+        if has_next:
+            remaining = total - (offset + PAGE_SIZE)
+            nav_buttons.append({
+                "type": "button",
+                "style": "primary",
+                "color": "#d97706",
+                "height": "sm",
+                "flex": 1,
+                "action": {
+                    "type": "message",
+                    "label": f"ถัดไป ({remaining}) ▶",
+                    "text": f"ร้านถัดไป:{category}:{offset + PAGE_SIZE}"
+                }
+            })
+
+        footer = {
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "paddingAll": "12px",
+            "contents": nav_buttons if nav_buttons else [
+                {
+                    "type": "text",
+                    "text": "✅ ดูครบทุกร้านแล้วค่ะ",
+                    "size": "xs",
+                    "color": "#888888",
+                    "align": "center"
+                }
+            ]
+        }
+
+        bubble = {
+            "type": "bubble",
+            "header": header,
+            "body": body,
+            "footer": footer
+        }
 
         _push(api, user_id, [
-            TextMessage(text=qr_text, quick_reply=QuickReply(items=quick_items))
+            FlexMessage(
+                alt_text=f"ร้าน{category} หน้า {current_page}/{total_pages}",
+                contents=FlexContainer.from_dict(bubble)
+            )
         ])
 
     except Exception as e:
@@ -821,9 +919,19 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 print(f"[ROUTE] matched อาหารหวาน")
                 send_restaurants_by_category(api, event, "อาหารหวาน")
 
-            # ── Quick Reply ร้านถัดไป ──
+            # ── pagination: ถัดไป / ก่อนหน้า ──
             elif t.startswith("ร้านถัดไป:"):
-                # format: "ร้านถัดไป:อาหารคาว:12"
+                parts = t.split(":")
+                if len(parts) == 3:
+                    _, cat, off = parts
+                    try:
+                        send_restaurants_by_category(api, event, cat, int(off))
+                    except ValueError:
+                        _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
+                else:
+                    _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
+
+            elif t.startswith("ร้านก่อนหน้า:"):
                 parts = t.split(":")
                 if len(parts) == 3:
                     _, cat, off = parts
