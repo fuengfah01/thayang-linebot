@@ -251,103 +251,61 @@ def home():
 
 
 # =========================
-# 🍽 PAGINATION — ร้านอาหาร
+# 🍽 RESTAURANT LIST + DETAIL
 # =========================
-PAGE_SIZE = 6  # จำนวน bubble ต่อหน้า (max 11 + 1 see-more = 12)
-
-
-def _flex_see_more_bubble(category: str, next_offset: int, remaining: int) -> dict:
-    """Bubble สุดท้ายแสดงปุ่ม 'ดูเพิ่มเติม' พร้อมจำนวนร้านที่เหลือ"""
-    return {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "justifyContent": "center",
-            "alignItems": "center",
-            "height": "160px",
-            "contents": [
-                {
-                    "type": "text",
-                    "text": f"มีร้านอีก {remaining} ร้านค่ะ 🍽️",
-                    "size": "md",
-                    "color": "#888888",
-                    "align": "center",
-                    "wrap": True,
-                },
-                {
-                    "type": "text",
-                    "text": "กดปุ่มด้านล่างเพื่อดูเพิ่มเติมค่ะ 😊",
-                    "size": "sm",
-                    "color": "#aaaaaa",
-                    "align": "center",
-                    "margin": "sm",
-                    "wrap": True,
-                },
-            ],
-        },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "paddingAll": "12px",
-            "contents": [
-                {
-                    "type": "button",
-                    "style": "primary",
-                    "color": "#d97706",
-                    "action": {
-                        "type": "message",
-                        "label": f"ดูเพิ่มเติม {remaining} ร้าน →",
-                        "text": f"ดูเพิ่ม:{category}:{next_offset}",
-                    },
-                }
-            ],
-        },
-    }
-
 
 def send_restaurants_by_category(api, event, category: str, offset: int = 0):
     """
-    ดึงร้านจาก DB ตาม category แล้วส่งเป็น flex carousel
-    รองรับ pagination ด้วย offset + bubble 'ดูเพิ่มเติม'
+    ขั้นที่ 1: ส่งรายชื่อร้านทั้งหมดเป็น text + Quick Reply ให้กดเลือก
+    กดชื่อร้านแล้ว → send_restaurant_detail_by_name ส่ง bubble ออกมา
     """
     user_id = event.source.user_id
     try:
-        total = count_restaurants_by_category(category)
-        rows = get_restaurants_by_category(category, limit=PAGE_SIZE, offset=offset)
-        print(f"[FOOD] category={repr(category)} offset={offset} total={total} got={len(rows)}")
+        rows = get_restaurants_by_category(category, limit=50, offset=0)
+        print(f"[FOOD] category={repr(category)} got={len(rows)}")
 
         if not rows:
             _push(api, user_id, [_text(f"ยังไม่มีข้อมูลร้าน{category}ค่ะ 🙏")])
             return
 
-        bubbles = [
-            _flex_restaurant_bubble(
-                r["name"], r.get("highlight"), r.get("cover_image"),
-                r.get("open_hours"), r.get("close_hours"), r.get("map_url")
-            )
-            for r in rows
-        ]
-
-        next_offset = offset + PAGE_SIZE
-        remaining = total - next_offset
-
-        # ถ้ายังมีร้านเหลืออยู่ → ต่อ bubble "ดูเพิ่มเติม"
-        if remaining > 0:
-            bubbles.append(_flex_see_more_bubble(category, next_offset, remaining))
-
         label = "อาหารคาว 🍜" if category == "อาหารคาว" else "อาหารหวาน 🍮"
-        container = (
-            bubbles[0] if len(bubbles) == 1
-            else {"type": "carousel", "contents": bubbles}
+
+        # สร้างข้อความรายชื่อร้านทั้งหมด
+        name_list = "\n".join(f"{i}. {r['name']}" for i, r in enumerate(rows, 1))
+        msg_text = (
+            f"🍽️ ร้าน{label}ในท่ายาง ({len(rows)} ร้าน)\n\n"
+            f"{name_list}\n\n"
+            f"👇 กดชื่อร้านเพื่อดูรายละเอียดค่ะ"
         )
 
+        # Quick Reply ทีละ 13 ชื่อ (LINE limit)
+        quick_items = [
+            QuickReplyItem(action=MessageAction(
+                label=r["name"][:20],
+                text=f"ร้าน {r['name']}"
+            ))
+            for r in rows[:13]
+        ]
+
         _push(api, user_id, [
-            FlexMessage(
-                alt_text=f"ร้าน{label}ในท่ายาง",
-                contents=FlexContainer.from_dict(container)
-            )
+            TextMessage(text=msg_text, quick_reply=QuickReply(items=quick_items))
         ])
+
+        # ถ้ามีร้านเกิน 13 → ส่ง Quick Reply ชุดที่ 2
+        if len(rows) > 13:
+            quick_items_2 = [
+                QuickReplyItem(action=MessageAction(
+                    label=r["name"][:20],
+                    text=f"ร้าน {r['name']}"
+                ))
+                for r in rows[13:26]
+            ]
+            _push(api, user_id, [
+                TextMessage(
+                    text="📋 ร้านที่เหลือ กดเลือกได้เลยค่ะ 👇",
+                    quick_reply=QuickReply(items=quick_items_2)
+                )
+            ])
 
     except Exception as e:
         print(f"[REST ERROR] {e}")
@@ -854,19 +812,6 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t in ["อาหารหวาน", "ร้านอาหารหวาน", "หวาน"]:
                 print(f"[ROUTE] matched อาหารหวาน")
                 send_restaurants_by_category(api, event, "อาหารหวาน")
-
-            # ── pagination ร้านอาหาร (กดปุ่ม "ดูเพิ่มเติม") ──
-            elif t.startswith("ดูเพิ่ม:"):
-                # format: "ดูเพิ่ม:อาหารคาว:6"
-                parts = t.split(":")
-                if len(parts) == 3:
-                    _, cat, off = parts
-                    try:
-                        send_restaurants_by_category(api, event, cat, int(off))
-                    except ValueError:
-                        _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
-                else:
-                    _push(api, user_id, [_text("ขอโทษค่ะ เกิดข้อผิดพลาดค่ะ 🙏")])
 
             elif t in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
