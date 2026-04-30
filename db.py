@@ -13,6 +13,7 @@ DB_CONFIG = {
     "autocommit": True,
 }
 
+
 def _fix_map_url(row):
     if not row:
         return row
@@ -31,15 +32,20 @@ def _fix_map_url(row):
         print(f"[MAP URL ERROR] {e}")
     return row
 
+
 def get_connection():
     try:
-        return mysql.connector.connect(**DB_CONFIG)
+        conn = mysql.connector.connect(**DB_CONFIG)
+        print(f"[DB] connection OK")
+        return conn
     except Error as e:
         print(f"[DB ERROR] get_connection failed: {e}")
         raise
 
+
 # legacy alias
 get_conn = get_connection
+
 
 def _execute(sql, args=()):
     conn = None
@@ -60,6 +66,7 @@ def _execute(sql, args=()):
             except Exception:
                 pass
 
+
 # =========================
 # chatbot_place
 # =========================
@@ -70,6 +77,7 @@ def search_place(keyword):
     )
     return _fix_map_url(rows[0]) if rows else None
 
+
 def get_places_by_category(category):
     rows = _execute(
         "SELECT * FROM chatbot_place WHERE category = %s ORDER BY place_id",
@@ -77,19 +85,24 @@ def get_places_by_category(category):
     )
     return [_fix_map_url(r) for r in rows]
 
+
 def get_all_place_names():
     rows = _execute("SELECT place_name FROM chatbot_place ORDER BY place_id")
     return [r["place_name"] for r in rows]
+
 
 # =========================
 # restaurant
 # =========================
 def get_restaurants_by_category(category):
+    print(f"[DB] get_restaurants_by_category: category={repr(category)}")
     rows = _execute(
         "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id LIMIT 5",
         (category,)
     )
+    print(f"[DB] get_restaurants_by_category: got {len(rows)} rows")
     return [_fix_map_url(r) for r in rows]
+
 
 def get_restaurant_detail(name: str):
     rows = _execute(
@@ -98,12 +111,14 @@ def get_restaurant_detail(name: str):
     )
     return _fix_map_url(rows[0]) if rows else None
 
+
 # =========================
 # souvenir_shop
 # =========================
 def get_all_souvenirs():
     rows = _execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
     return [_fix_map_url(r) for r in rows]
+
 
 # =========================
 # about_us
@@ -114,6 +129,7 @@ def get_about(section: str) -> str:
         (section,)
     )
     return rows[0]["content"] if rows else ""
+
 
 # =========================
 # misc
