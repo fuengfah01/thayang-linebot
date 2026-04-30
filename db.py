@@ -13,6 +13,7 @@ DB_CONFIG = {
     "autocommit": True,
 }
 
+
 def _fix_map_url(row):
     if not row:
         return row
@@ -31,6 +32,7 @@ def _fix_map_url(row):
         print(f"[MAP URL ERROR] {e}")
     return row
 
+
 def get_connection():
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -40,8 +42,10 @@ def get_connection():
         print(f"[DB ERROR] get_connection failed: {e}")
         raise
 
+
 # legacy alias
 get_conn = get_connection
+
 
 def _execute(sql, args=()):
     conn = None
@@ -62,6 +66,7 @@ def _execute(sql, args=()):
             except Exception:
                 pass
 
+
 # =========================
 # chatbot_place
 # =========================
@@ -72,6 +77,7 @@ def search_place(keyword):
     )
     return _fix_map_url(rows[0]) if rows else None
 
+
 def get_places_by_category(category):
     rows = _execute(
         "SELECT * FROM chatbot_place WHERE category = %s ORDER BY place_id",
@@ -79,21 +85,34 @@ def get_places_by_category(category):
     )
     return [_fix_map_url(r) for r in rows]
 
+
 def get_all_place_names():
     rows = _execute("SELECT place_name FROM chatbot_place ORDER BY place_id")
     return [r["place_name"] for r in rows]
 
+
 # =========================
-# restaurant  ← ลบ LIMIT 5 ออกแล้ว ดึงทุกแถว
+# restaurant
 # =========================
-def get_restaurants_by_category(category):
-    print(f"[DB] get_restaurants_by_category: category={repr(category)}")
+def get_restaurants_by_category(category, limit=6, offset=0):
+    """ดึงร้านอาหารตาม category รองรับ pagination ด้วย limit/offset"""
+    print(f"[DB] get_restaurants_by_category: category={repr(category)} limit={limit} offset={offset}")
     rows = _execute(
-        "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id",
+        "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id LIMIT %s OFFSET %s",
+        (category, limit, offset)
+    )
+    print(f"[DB] got {len(rows)} rows")
+    return [_fix_map_url(r) for r in rows]
+
+
+def count_restaurants_by_category(category):
+    """นับจำนวนร้านอาหารทั้งหมดใน category"""
+    rows = _execute(
+        "SELECT COUNT(*) as total FROM restaurant WHERE category = %s",
         (category,)
     )
-    print(f"[DB] get_restaurants_by_category: got {len(rows)} rows")
-    return [_fix_map_url(r) for r in rows]
+    return rows[0]["total"] if rows else 0
+
 
 def get_restaurant_detail(name: str):
     rows = _execute(
@@ -102,12 +121,14 @@ def get_restaurant_detail(name: str):
     )
     return _fix_map_url(rows[0]) if rows else None
 
+
 # =========================
 # souvenir_shop
 # =========================
 def get_all_souvenirs():
     rows = _execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
     return [_fix_map_url(r) for r in rows]
+
 
 # =========================
 # about_us
@@ -118,6 +139,7 @@ def get_about(section: str) -> str:
         (section,)
     )
     return rows[0]["content"] if rows else ""
+
 
 # =========================
 # misc
