@@ -12,7 +12,8 @@ from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from db import (
     search_place, get_places_by_category, get_all_place_names,
     get_restaurants_by_category, count_restaurants_by_category,
-    get_all_souvenirs, get_about, get_restaurant_detail
+    get_all_souvenirs, get_about, get_restaurant_detail,
+    get_all_activities,
 )
 from places import places
 from ai_helper import ask_ai
@@ -739,9 +740,6 @@ activity_details = {
     "ตะลอนกินในท่ายาง":    "🍜 ตะลอนกินในท่ายาง\n\n• ตลาดสดท่ายาง\n• ร้านทองม้วนแม่เล็ก\n• ร้านผัดไทย 100 ปี\n• ร้านข้าวแช่แม่เล็ก สกิดใจ",
 }
 
-# ── ข้อมูลกิจกรรมสำหรับสร้างการ์ด ──
-# NOTE: image_url ใช้รูปจาก DB (cover_image ของสถานที่แรกในแต่ละ activity)
-# ถ้าต้องการเปลี่ยนรูป ให้แก้ image_url ในแต่ละ card ด้านล่างนี้
 ACTIVITY_CARDS = [
     {
         "key":       "ไหว้พระในท่ายาง",
@@ -749,7 +747,7 @@ ACTIVITY_CARDS = [
         "color":     "#7c3aed",
         "emoji":     "🙏",
         "subtitle":  "วัดท่าคอย · ศาลเจ้าพ่อกวนอู · ศาลเจ้าแม่ทับทิม",
-        "image_url": "",   # ← ใส่ URL รูปภาพวัดท่าคอย หรือ cover_image จาก DB
+        "image_url": "",
         "places": [
             {"place_name": "วัดท่าคอย",         "map_url": "https://maps.google.com/?q=วัดท่าคอย+ท่ายาง+เพชรบุรี"},
             {"place_name": "ศาลเจ้าพ่อกวนอู",  "map_url": "https://maps.google.com/?q=ศาลเจ้าพ่อกวนอู+ท่ายาง"},
@@ -762,7 +760,7 @@ ACTIVITY_CARDS = [
         "color":     "#0369a1",
         "emoji":     "📸",
         "subtitle":  "วัดท่าคอย · อุโบสถ 100 ปี · ศาลเจ้าแม่ทับทิม",
-        "image_url": "",   # ← ใส่ URL รูปภาพอุโบสถ 100 ปี หรือ cover_image จาก DB
+        "image_url": "",
         "places": [
             {"place_name": "วัดท่าคอย",         "map_url": "https://maps.google.com/?q=วัดท่าคอย+ท่ายาง+เพชรบุรี"},
             {"place_name": "อุโบสถ 100 ปี",     "map_url": "https://maps.google.com/?q=อุโบสถ+100+ปี+วัดท่าคอย"},
@@ -775,7 +773,7 @@ ACTIVITY_CARDS = [
         "color":     "#0f766e",
         "emoji":     "🐟",
         "subtitle":  "อุทยานปลาวัดท่าคอย",
-        "image_url": "",   # ← ใส่ URL รูปภาพอุทยานปลา หรือ cover_image จาก DB
+        "image_url": "",
         "places": [
             {"place_name": "อุทยานปลาวัดท่าคอย", "map_url": "https://maps.google.com/?q=อุทยานปลาวัดท่าคอย+เพชรบุรี"},
         ],
@@ -786,7 +784,7 @@ ACTIVITY_CARDS = [
         "color":     "#b45309",
         "emoji":     "🍜",
         "subtitle":  "ตลาดสด · ทองม้วนแม่เล็ก · ผัดไทย 100 ปี · ข้าวแช่",
-        "image_url": "",   # ← ใส่ URL รูปภาพตลาดสดท่ายาง หรือ cover_image จาก DB
+        "image_url": "",
         "places": [
             {"place_name": "ตลาดสดท่ายาง",       "map_url": "https://maps.google.com/?q=ตลาดสดท่ายาง+เพชรบุรี"},
             {"place_name": "ร้านทองม้วนแม่เล็ก", "map_url": "https://maps.google.com/?q=12.9731808,99.8891799"},
@@ -798,39 +796,24 @@ ACTIVITY_CARDS = [
 
 
 def _load_activity_images():
-    """
-    โหลดรูปจาก DB อัตโนมัติสำหรับ card ที่ยังไม่มี image_url
-    ดึง cover_image จาก place แรกของแต่ละ activity
-    """
-    place_image_cache = {}
+    """ดึง image_url จาก activity table ตรงๆ โดย match จาก field 'name'"""
     try:
-        rows = get_places_by_category("travel") or []
-        rows += get_places_by_category("eat") or []
-        for r in rows:
-            name = r.get("place_name", "")
-            img  = r.get("cover_image", "")
-            if name and img:
-                place_image_cache[name] = img
-    except Exception as e:
-        print(f"[ACTIVITY IMG] DB error: {e}")
-
-    for card in ACTIVITY_CARDS:
-        if not card.get("image_url"):
-            # หารูปจากสถานที่แรกใน places list
-            for p in card["places"]:
-                img = place_image_cache.get(p["place_name"], "")
-                if img:
+        rows = get_all_activities()
+        for row in rows:
+            db_name = (row.get("name") or "").strip()
+            img     = (row.get("image_url") or "").strip()
+            if not img:
+                continue
+            for card in ACTIVITY_CARDS:
+                if card["key"] == db_name:
                     card["image_url"] = img
                     break
+    except Exception as e:
+        print(f"[ACTIVITY IMG] DB error: {e}")
+        import traceback; traceback.print_exc()
 
 
 def _flex_activity_bubble(card: dict) -> dict:
-    """
-    สร้าง Flex Bubble การ์ดกิจกรรม 1 ใบ แบบมีรูปภาพ (hero) เหมือน image 2
-    - hero:   รูปภาพสถานที่ (cover_image จาก DB)
-    - body:   ชื่อกิจกรรม + subtitle + รายชื่อสถานที่พร้อมปุ่มแผนที่
-    - footer: ปุ่ม "ดูรายละเอียดทั้งหมด"
-    """
     image_url = card.get("image_url", "")
 
     place_rows = []
@@ -877,7 +860,6 @@ def _flex_activity_bubble(card: dict) -> dict:
             "spacing": "sm",
             "paddingAll": "16px",
             "contents": [
-                # ชื่อกิจกรรม
                 {
                     "type": "text",
                     "text": f"{card['emoji']} {card['label']}",
@@ -886,7 +868,6 @@ def _flex_activity_bubble(card: dict) -> dict:
                     "color": card["color"],
                     "wrap": True,
                 },
-                # subtitle
                 {
                     "type": "text",
                     "text": card["subtitle"],
@@ -896,7 +877,6 @@ def _flex_activity_bubble(card: dict) -> dict:
                     "margin": "xs",
                 },
                 {"type": "separator", "margin": "md"},
-                # หัวข้อสถานที่แนะนำ
                 {
                     "type": "text",
                     "text": "📍 สถานที่แนะนำ",
@@ -905,7 +885,6 @@ def _flex_activity_bubble(card: dict) -> dict:
                     "color": card["color"],
                     "margin": "md",
                 },
-                # รายชื่อสถานที่
                 *place_rows,
             ],
         },
@@ -929,7 +908,6 @@ def _flex_activity_bubble(card: dict) -> dict:
         },
     }
 
-    # เพิ่ม hero รูปภาพ (เหมือน image 2) ถ้ามี URL
     if image_url:
         bubble["hero"] = {
             "type": "image",
@@ -944,7 +922,6 @@ def _flex_activity_bubble(card: dict) -> dict:
 
 def send_activity(api, event):
     user_id = event.source.user_id
-    # โหลดรูปจาก DB ก่อนส่ง
     _load_activity_images()
     bubbles = [_flex_activity_bubble(c) for c in ACTIVITY_CARDS]
     _push(api, user_id, [
