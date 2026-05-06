@@ -740,13 +740,16 @@ activity_details = {
 }
 
 # ── ข้อมูลกิจกรรมสำหรับสร้างการ์ด ──
+# NOTE: image_url ใช้รูปจาก DB (cover_image ของสถานที่แรกในแต่ละ activity)
+# ถ้าต้องการเปลี่ยนรูป ให้แก้ image_url ในแต่ละ card ด้านล่างนี้
 ACTIVITY_CARDS = [
     {
-        "key":      "ไหว้พระในท่ายาง",
-        "label":    "ไหว้พระทำบุญ",
-        "color":    "#7c3aed",
-        "emoji":    "🙏",
-        "subtitle": "วัดท่าคอย · ศาลเจ้าพ่อกวนอู · ศาลเจ้าแม่ทับทิม",
+        "key":       "ไหว้พระในท่ายาง",
+        "label":     "ไหว้พระทำบุญ",
+        "color":     "#7c3aed",
+        "emoji":     "🙏",
+        "subtitle":  "วัดท่าคอย · ศาลเจ้าพ่อกวนอู · ศาลเจ้าแม่ทับทิม",
+        "image_url": "",   # ← ใส่ URL รูปภาพวัดท่าคอย หรือ cover_image จาก DB
         "places": [
             {"place_name": "วัดท่าคอย",         "map_url": "https://maps.google.com/?q=วัดท่าคอย+ท่ายาง+เพชรบุรี"},
             {"place_name": "ศาลเจ้าพ่อกวนอู",  "map_url": "https://maps.google.com/?q=ศาลเจ้าพ่อกวนอู+ท่ายาง"},
@@ -754,11 +757,12 @@ ACTIVITY_CARDS = [
         ],
     },
     {
-        "key":      "ถ่ายรูปในท่ายาง",
-        "label":    "ถ่ายรูปเช็คอิน",
-        "color":    "#0369a1",
-        "emoji":    "📸",
-        "subtitle": "วัดท่าคอย · อุโบสถ 100 ปี · ศาลเจ้าแม่ทับทิม",
+        "key":       "ถ่ายรูปในท่ายาง",
+        "label":     "ถ่ายรูปเช็คอิน",
+        "color":     "#0369a1",
+        "emoji":     "📸",
+        "subtitle":  "วัดท่าคอย · อุโบสถ 100 ปี · ศาลเจ้าแม่ทับทิม",
+        "image_url": "",   # ← ใส่ URL รูปภาพอุโบสถ 100 ปี หรือ cover_image จาก DB
         "places": [
             {"place_name": "วัดท่าคอย",         "map_url": "https://maps.google.com/?q=วัดท่าคอย+ท่ายาง+เพชรบุรี"},
             {"place_name": "อุโบสถ 100 ปี",     "map_url": "https://maps.google.com/?q=อุโบสถ+100+ปี+วัดท่าคอย"},
@@ -766,21 +770,23 @@ ACTIVITY_CARDS = [
         ],
     },
     {
-        "key":      "ให้อาหารปลาในท่ายาง",
-        "label":    "ให้อาหารปลา",
-        "color":    "#0f766e",
-        "emoji":    "🐟",
-        "subtitle": "อุทยานปลาวัดท่าคอย",
+        "key":       "ให้อาหารปลาในท่ายาง",
+        "label":     "ให้อาหารปลา",
+        "color":     "#0f766e",
+        "emoji":     "🐟",
+        "subtitle":  "อุทยานปลาวัดท่าคอย",
+        "image_url": "",   # ← ใส่ URL รูปภาพอุทยานปลา หรือ cover_image จาก DB
         "places": [
             {"place_name": "อุทยานปลาวัดท่าคอย", "map_url": "https://maps.google.com/?q=อุทยานปลาวัดท่าคอย+เพชรบุรี"},
         ],
     },
     {
-        "key":      "ตะลอนกินในท่ายาง",
-        "label":    "ตะลอนกิน",
-        "color":    "#b45309",
-        "emoji":    "🍜",
-        "subtitle": "ตลาดสด · ทองม้วนแม่เล็ก · ผัดไทย 100 ปี · ข้าวแช่",
+        "key":       "ตะลอนกินในท่ายาง",
+        "label":     "ตะลอนกิน",
+        "color":     "#b45309",
+        "emoji":     "🍜",
+        "subtitle":  "ตลาดสด · ทองม้วนแม่เล็ก · ผัดไทย 100 ปี · ข้าวแช่",
+        "image_url": "",   # ← ใส่ URL รูปภาพตลาดสดท่ายาง หรือ cover_image จาก DB
         "places": [
             {"place_name": "ตลาดสดท่ายาง",       "map_url": "https://maps.google.com/?q=ตลาดสดท่ายาง+เพชรบุรี"},
             {"place_name": "ร้านทองม้วนแม่เล็ก", "map_url": "https://maps.google.com/?q=12.9731808,99.8891799"},
@@ -791,13 +797,42 @@ ACTIVITY_CARDS = [
 ]
 
 
+def _load_activity_images():
+    """
+    โหลดรูปจาก DB อัตโนมัติสำหรับ card ที่ยังไม่มี image_url
+    ดึง cover_image จาก place แรกของแต่ละ activity
+    """
+    place_image_cache = {}
+    try:
+        rows = get_places_by_category("travel") or []
+        rows += get_places_by_category("eat") or []
+        for r in rows:
+            name = r.get("place_name", "")
+            img  = r.get("cover_image", "")
+            if name and img:
+                place_image_cache[name] = img
+    except Exception as e:
+        print(f"[ACTIVITY IMG] DB error: {e}")
+
+    for card in ACTIVITY_CARDS:
+        if not card.get("image_url"):
+            # หารูปจากสถานที่แรกใน places list
+            for p in card["places"]:
+                img = place_image_cache.get(p["place_name"], "")
+                if img:
+                    card["image_url"] = img
+                    break
+
+
 def _flex_activity_bubble(card: dict) -> dict:
     """
-    สร้าง Flex Bubble การ์ดกิจกรรม 1 ใบ
-    - header: พื้นสีตาม card["color"] + emoji + ชื่อ + subtitle
-    - body:   รายชื่อสถานที่ พร้อมปุ่มแผนที่แต่ละที่
-    - footer: ปุ่ม "ดูรายละเอียดทั้งหมด" → ส่ง key กลับ
+    สร้าง Flex Bubble การ์ดกิจกรรม 1 ใบ แบบมีรูปภาพ (hero) เหมือน image 2
+    - hero:   รูปภาพสถานที่ (cover_image จาก DB)
+    - body:   ชื่อกิจกรรม + subtitle + รายชื่อสถานที่พร้อมปุ่มแผนที่
+    - footer: ปุ่ม "ดูรายละเอียดทั้งหมด"
     """
+    image_url = card.get("image_url", "")
+
     place_rows = []
     for p in card["places"]:
         place_rows.append({
@@ -834,55 +869,43 @@ def _flex_activity_bubble(card: dict) -> dict:
             ],
         })
 
-    return {
+    bubble = {
         "type": "bubble",
-        "header": {
+        "body": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": card["color"],
-            "paddingAll": "20px",
+            "spacing": "sm",
+            "paddingAll": "16px",
             "contents": [
+                # ชื่อกิจกรรม
                 {
                     "type": "text",
-                    "text": card["emoji"],
-                    "size": "xxl",
-                    "align": "center",
-                },
-                {
-                    "type": "text",
-                    "text": card["label"],
+                    "text": f"{card['emoji']} {card['label']}",
                     "weight": "bold",
                     "size": "lg",
-                    "color": "#ffffff",
-                    "align": "center",
-                    "margin": "sm",
+                    "color": card["color"],
                     "wrap": True,
                 },
+                # subtitle
                 {
                     "type": "text",
                     "text": card["subtitle"],
                     "size": "xs",
-                    "color": "#ffffffcc",
-                    "align": "center",
-                    "margin": "xs",
+                    "color": "#888888",
                     "wrap": True,
+                    "margin": "xs",
                 },
-            ],
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "spacing": "xs",
-            "paddingAll": "14px",
-            "contents": [
+                {"type": "separator", "margin": "md"},
+                # หัวข้อสถานที่แนะนำ
                 {
                     "type": "text",
                     "text": "📍 สถานที่แนะนำ",
                     "weight": "bold",
                     "size": "sm",
                     "color": card["color"],
+                    "margin": "md",
                 },
-                {"type": "separator", "margin": "sm"},
+                # รายชื่อสถานที่
                 *place_rows,
             ],
         },
@@ -906,9 +929,23 @@ def _flex_activity_bubble(card: dict) -> dict:
         },
     }
 
+    # เพิ่ม hero รูปภาพ (เหมือน image 2) ถ้ามี URL
+    if image_url:
+        bubble["hero"] = {
+            "type": "image",
+            "url": image_url,
+            "size": "full",
+            "aspectRatio": "20:13",
+            "aspectMode": "cover",
+        }
+
+    return bubble
+
 
 def send_activity(api, event):
     user_id = event.source.user_id
+    # โหลดรูปจาก DB ก่อนส่ง
+    _load_activity_images()
     bubbles = [_flex_activity_bubble(c) for c in ACTIVITY_CARDS]
     _push(api, user_id, [
         _text("🧭 กิจกรรมแนะนำในอำเภอท่ายาง\nเลือกกิจกรรมที่สนใจได้เลยค่ะ 👇"),
