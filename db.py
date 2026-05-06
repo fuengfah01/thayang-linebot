@@ -3,11 +3,11 @@ from mysql.connector import Error
 from urllib.parse import quote_plus
 
 DB_CONFIG = {
-    "host": "sql7.freesqldatabase.com",
+    "host": "sql12.freesqldatabase.com",
     "port": 3306,
-    "user": "sql7824635",
-    "password": "iUz24J2d6E",
-    "database": "sql7824635",
+    "user": "sql12825543",
+    "password": "BiDtrBXwmJ",
+    "database": "sql12825543",
     "connection_timeout": 8,
     "connect_timeout": 8,
     "autocommit": True,
