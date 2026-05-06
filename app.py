@@ -228,6 +228,74 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
     return bubble
 
 
+def _flex_place_detail_bubble(p: dict) -> dict:
+    """
+    สร้าง Flex Bubble รายละเอียดสถานที่จาก DB row (chatbot_place)
+    แสดง: รูป, ชื่อ, ประวัติ, จุดเด่น, เวลา, ปุ่มแผนที่
+    """
+    name        = p.get("place_name", "")
+    description = p.get("place_description", "")
+    highlight   = p.get("highlight", "")
+    image_url   = p.get("cover_image", "")
+    open_time   = p.get("open_time", "")
+    close_time  = p.get("close_time", "")
+    map_url     = p.get("map_url", "")
+
+    body_contents = [
+        {"type": "text", "text": name, "weight": "bold", "size": "xl", "wrap": True, "color": "#1a1a2e"},
+    ]
+
+    if description:
+        body_contents += [
+            {"type": "separator", "margin": "md"},
+            {"type": "text", "text": "📖 ประวัติ", "weight": "bold", "size": "sm", "color": "#2d7a3a", "margin": "md"},
+            {"type": "text", "text": description, "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
+        ]
+
+    if highlight:
+        body_contents += [
+            {"type": "separator", "margin": "md"},
+            {"type": "text", "text": "⭐ จุดเด่น", "weight": "bold", "size": "sm", "color": "#2d7a3a", "margin": "md"},
+            {"type": "text", "text": highlight, "size": "sm", "color": "#555555", "wrap": True, "margin": "sm"},
+        ]
+
+    if open_time and close_time:
+        body_contents += [
+            {"type": "separator", "margin": "md"},
+            {"type": "box", "layout": "horizontal", "margin": "md", "contents": [
+                {"type": "text", "text": "🕐 เวลาเปิด-ปิด", "size": "sm", "color": "#888888", "flex": 2},
+                {"type": "text", "text": f"{str(open_time)[:5]} – {str(close_time)[:5]} น.",
+                 "size": "sm", "color": "#1a1a2e", "flex": 3, "align": "end"},
+            ]},
+        ]
+
+    bubble = {
+        "type": "bubble", "size": "giga",
+        "body": {
+            "type": "box", "layout": "vertical",
+            "paddingAll": "16px",
+            "contents": body_contents
+        },
+        "footer": {
+            "type": "box", "layout": "vertical", "paddingAll": "12px",
+            "contents": [
+                {
+                    "type": "button", "style": "primary", "color": "#2d7a3a", "height": "sm",
+                    "action": {"type": "uri", "label": "🗺 ดูแผนที่", "uri": _safe_uri(map_url)}
+                }
+            ]
+        }
+    }
+
+    if image_url:
+        bubble["hero"] = {
+            "type": "image", "url": image_url,
+            "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
+        }
+
+    return bubble
+
+
 def _send_flex_carousel(api, user_id: str, alt_text: str, bubbles: list):
     """ส่ง flex carousel ด้วย push_message โดยตรง"""
     bubbles = [b for b in bubbles if b][:12]
@@ -525,31 +593,51 @@ def dialogflow_webhook():
 # 📍 PLACE / RESTAURANT / SOUVENIR FUNCTIONS
 # =========================
 def send_place_detail(api, event, name):
+    """
+    แสดงรายละเอียดสถานที่เป็น Flex Bubble
+    - ค้นจาก DB ก่อนเสมอ (ครอบคลุมสถานที่ใหม่ที่เพิ่มทีหลัง)
+    - ถ้าไม่พบใน DB ค่อย fallback ไปดู places dict (legacy)
+    """
     user_id = event.source.user_id
+
+    # ── ค้นจาก DB ก่อน ──
+    p = search_place(name)
+    if p:
+        try:
+            bubble = _flex_place_detail_bubble(p)
+            _push(api, user_id, [
+                FlexMessage(
+                    alt_text=p.get("place_name", name),
+                    contents=FlexContainer.from_dict(bubble)
+                )
+            ])
+        except Exception as e:
+            print(f"[PLACE DETAIL FLEX ERROR] {e}")
+            import traceback; traceback.print_exc()
+            # fallback to text if flex fails
+            msg = f"📍 {p['place_name']}\n\n📖 {p.get('place_description', '')}"
+            if p.get("open_time") and p.get("close_time"):
+                msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
+            _push(api, user_id, [_text(msg)])
+        return
+
+    # ── fallback: places dict (legacy) ──
     if name in places:
-        p = places[name]
+        p_legacy = places[name]
         msgs = []
-        if p.get("images"):
-            msgs.append(_image(p["images"][0]))
-        msgs.append(_text(f"📍 {name}\n\n📖 {p.get('history', '')}"))
-        detail = f"⭐ จุดเด่น\n{p.get('highlight', '')}"
-        if p.get("time"):
-            detail += f"\n\n🕐 เวลา {p['time']} น."
-        if p.get("map"):
-            detail += f"\n\n🗺 {p['map']}"
+        if p_legacy.get("images"):
+            msgs.append(_image(p_legacy["images"][0]))
+        msgs.append(_text(f"📍 {name}\n\n📖 {p_legacy.get('history', '')}"))
+        detail = f"⭐ จุดเด่น\n{p_legacy.get('highlight', '')}"
+        if p_legacy.get("time"):
+            detail += f"\n\n🕐 เวลา {p_legacy['time']} น."
+        if p_legacy.get("map"):
+            detail += f"\n\n🗺 {p_legacy['map']}"
         msgs.append(_text(detail))
         _push(api, user_id, msgs)
         return
 
-    p = search_place(name)
-    if not p:
-        _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {name} ค่ะ")])
-        return
-    cat = "🏛️ สถานที่ท่องเที่ยว" if p["category"] == "travel" else "🍽️ ร้านอาหาร"
-    msg = f"{cat}\n\n📍 {p['place_name']}\n\n📖 {p['place_description']}"
-    if p.get("open_time") and p.get("close_time"):
-        msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
-    _push(api, user_id, [_text(msg)])
+    _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {name} ค่ะ")])
 
 
 def send_places(api, event):
