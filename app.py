@@ -165,7 +165,6 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
     footer_contents.append({
         "type": "button", "style": "secondary", "height": "sm",
         "margin": "sm" if map_url else "none",
-        # ✅ แก้ไข: ใช้ prefix "รายละเอียด" แทน text ชื่อเปล่า เพื่อให้ route จับได้
         "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"รายละเอียด{name}"}
     })
 
@@ -230,10 +229,6 @@ def _flex_souvenir_bubble(name, description, phone, time_str, map_url):
 
 
 def _flex_place_detail_bubble(p: dict) -> dict:
-    """
-    สร้าง Flex Bubble รายละเอียดสถานที่จาก DB row (chatbot_place)
-    แสดง: รูป, ชื่อ, ประวัติ, จุดเด่น, เวลา, ปุ่มแผนที่
-    """
     name        = p.get("place_name", "")
     description = p.get("place_description", "")
     highlight   = p.get("highlight", "")
@@ -322,14 +317,10 @@ def home():
 # =========================
 # 🍽 RESTAURANT LIST + DETAIL
 # =========================
-PAGE_SIZE = 8  # จำนวนร้านต่อหน้า
+PAGE_SIZE = 8
 
 
 def send_restaurants_by_category(api, event, category: str, offset: int = 0):
-    """
-    ส่ง Flex Bubble รายชื่อร้านพร้อมปุ่ม ◀ ก่อนหน้า / ถัดไป ▶
-    กดชื่อร้าน → ส่ง message "ร้าน {name}" → send_restaurant_detail_by_name
-    """
     user_id = event.source.user_id
     try:
         rows = get_restaurants_by_category(category, limit=50, offset=0)
@@ -348,7 +339,6 @@ def send_restaurants_by_category(api, event, category: str, offset: int = 0):
 
         label_emoji = "🍜" if category == "อาหารคาว" else "🍮"
 
-        # ── header ──
         header = {
             "type": "box",
             "layout": "vertical",
@@ -372,7 +362,6 @@ def send_restaurants_by_category(api, event, category: str, offset: int = 0):
             ]
         }
 
-        # ── body — รายชื่อร้าน ──
         shop_rows = []
         for i, r in enumerate(chunk, start=offset + 1):
             shop_rows.append({
@@ -418,7 +407,6 @@ def send_restaurants_by_category(api, event, category: str, offset: int = 0):
             "contents": shop_rows
         }
 
-        # ── footer — ปุ่ม ◀ / ▶ ──
         nav_buttons = []
 
         if has_prev:
@@ -594,14 +582,8 @@ def dialogflow_webhook():
 # 📍 PLACE / RESTAURANT / SOUVENIR FUNCTIONS
 # =========================
 def send_place_detail(api, event, name):
-    """
-    แสดงรายละเอียดสถานที่เป็น Flex Bubble
-    - ค้นจาก DB ก่อนเสมอ (ครอบคลุมสถานที่ใหม่ที่เพิ่มทีหลัง)
-    - ถ้าไม่พบใน DB ค่อย fallback ไปดู places dict (legacy)
-    """
     user_id = event.source.user_id
 
-    # ── ค้นจาก DB ก่อน ──
     p = search_place(name)
     if p:
         try:
@@ -615,14 +597,12 @@ def send_place_detail(api, event, name):
         except Exception as e:
             print(f"[PLACE DETAIL FLEX ERROR] {e}")
             import traceback; traceback.print_exc()
-            # fallback to text if flex fails
             msg = f"📍 {p['place_name']}\n\n📖 {p.get('place_description', '')}"
             if p.get("open_time") and p.get("close_time"):
                 msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
             _push(api, user_id, [_text(msg)])
         return
 
-    # ── fallback: places dict (legacy) ──
     if name in places:
         p_legacy = places[name]
         msgs = []
@@ -759,20 +739,186 @@ activity_details = {
     "ตะลอนกินในท่ายาง":    "🍜 ตะลอนกินในท่ายาง\n\n• ตลาดสดท่ายาง\n• ร้านทองม้วนแม่เล็ก\n• ร้านผัดไทย 100 ปี\n• ร้านข้าวแช่แม่เล็ก สกิดใจ",
 }
 
+# ── ข้อมูลกิจกรรมสำหรับสร้างการ์ด ──
+ACTIVITY_CARDS = [
+    {
+        "key":      "ไหว้พระในท่ายาง",
+        "label":    "ไหว้พระทำบุญ",
+        "color":    "#7c3aed",
+        "emoji":    "🙏",
+        "subtitle": "วัดท่าคอย · ศาลเจ้าพ่อกวนอู · ศาลเจ้าแม่ทับทิม",
+        "places": [
+            {"place_name": "วัดท่าคอย",         "map_url": "https://maps.google.com/?q=วัดท่าคอย+ท่ายาง+เพชรบุรี"},
+            {"place_name": "ศาลเจ้าพ่อกวนอู",  "map_url": "https://maps.google.com/?q=ศาลเจ้าพ่อกวนอู+ท่ายาง"},
+            {"place_name": "ศาลเจ้าแม่ทับทิม", "map_url": "https://maps.google.com/?q=ศาลเจ้าแม่ทับทิม+ท่ายาง"},
+        ],
+    },
+    {
+        "key":      "ถ่ายรูปในท่ายาง",
+        "label":    "ถ่ายรูปเช็คอิน",
+        "color":    "#0369a1",
+        "emoji":    "📸",
+        "subtitle": "วัดท่าคอย · อุโบสถ 100 ปี · ศาลเจ้าแม่ทับทิม",
+        "places": [
+            {"place_name": "วัดท่าคอย",         "map_url": "https://maps.google.com/?q=วัดท่าคอย+ท่ายาง+เพชรบุรี"},
+            {"place_name": "อุโบสถ 100 ปี",     "map_url": "https://maps.google.com/?q=อุโบสถ+100+ปี+วัดท่าคอย"},
+            {"place_name": "ศาลเจ้าแม่ทับทิม", "map_url": "https://maps.google.com/?q=ศาลเจ้าแม่ทับทิม+ท่ายาง"},
+        ],
+    },
+    {
+        "key":      "ให้อาหารปลาในท่ายาง",
+        "label":    "ให้อาหารปลา",
+        "color":    "#0f766e",
+        "emoji":    "🐟",
+        "subtitle": "อุทยานปลาวัดท่าคอย",
+        "places": [
+            {"place_name": "อุทยานปลาวัดท่าคอย", "map_url": "https://maps.google.com/?q=อุทยานปลาวัดท่าคอย+เพชรบุรี"},
+        ],
+    },
+    {
+        "key":      "ตะลอนกินในท่ายาง",
+        "label":    "ตะลอนกิน",
+        "color":    "#b45309",
+        "emoji":    "🍜",
+        "subtitle": "ตลาดสด · ทองม้วนแม่เล็ก · ผัดไทย 100 ปี · ข้าวแช่",
+        "places": [
+            {"place_name": "ตลาดสดท่ายาง",       "map_url": "https://maps.google.com/?q=ตลาดสดท่ายาง+เพชรบุรี"},
+            {"place_name": "ร้านทองม้วนแม่เล็ก", "map_url": "https://maps.google.com/?q=12.9731808,99.8891799"},
+            {"place_name": "ร้านผัดไทย 100 ปี",  "map_url": "https://maps.google.com/?q=ผัดไทย+100+ปี+ท่ายาง"},
+            {"place_name": "ร้านข้าวแช่แม่เล็ก", "map_url": "https://maps.google.com/?q=ข้าวแช่แม่เล็ก+ท่ายาง"},
+        ],
+    },
+]
+
+
+def _flex_activity_bubble(card: dict) -> dict:
+    """
+    สร้าง Flex Bubble การ์ดกิจกรรม 1 ใบ
+    - header: พื้นสีตาม card["color"] + emoji + ชื่อ + subtitle
+    - body:   รายชื่อสถานที่ พร้อมปุ่มแผนที่แต่ละที่
+    - footer: ปุ่ม "ดูรายละเอียดทั้งหมด" → ส่ง key กลับ
+    """
+    place_rows = []
+    for p in card["places"]:
+        place_rows.append({
+            "type": "box",
+            "layout": "horizontal",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "•",
+                    "size": "sm",
+                    "color": "#888888",
+                    "flex": 0,
+                },
+                {
+                    "type": "text",
+                    "text": p["place_name"],
+                    "size": "sm",
+                    "color": "#1a1a2e",
+                    "flex": 1,
+                    "wrap": True,
+                },
+                {
+                    "type": "button",
+                    "style": "link",
+                    "height": "sm",
+                    "flex": 0,
+                    "action": {
+                        "type": "uri",
+                        "label": "🗺",
+                        "uri": _safe_uri(p["map_url"]),
+                    },
+                },
+            ],
+        })
+
+    return {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "backgroundColor": card["color"],
+            "paddingAll": "20px",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": card["emoji"],
+                    "size": "xxl",
+                    "align": "center",
+                },
+                {
+                    "type": "text",
+                    "text": card["label"],
+                    "weight": "bold",
+                    "size": "lg",
+                    "color": "#ffffff",
+                    "align": "center",
+                    "margin": "sm",
+                    "wrap": True,
+                },
+                {
+                    "type": "text",
+                    "text": card["subtitle"],
+                    "size": "xs",
+                    "color": "#ffffffcc",
+                    "align": "center",
+                    "margin": "xs",
+                    "wrap": True,
+                },
+            ],
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "xs",
+            "paddingAll": "14px",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "📍 สถานที่แนะนำ",
+                    "weight": "bold",
+                    "size": "sm",
+                    "color": card["color"],
+                },
+                {"type": "separator", "margin": "sm"},
+                *place_rows,
+            ],
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "paddingAll": "12px",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "primary",
+                    "color": card["color"],
+                    "height": "sm",
+                    "action": {
+                        "type": "message",
+                        "label": "ดูรายละเอียดทั้งหมด",
+                        "text": card["key"],
+                    },
+                }
+            ],
+        },
+    }
+
 
 def send_activity(api, event):
     user_id = event.source.user_id
+    bubbles = [_flex_activity_bubble(c) for c in ACTIVITY_CARDS]
     _push(api, user_id, [
-        _text("🧭 กิจกรรมแนะนำในท่ายาง"),
-        TextMessage(
-            text="👇 กดเลือกกิจกรรมที่สนใจได้เลยค่ะ",
-            quick_reply=QuickReply(items=[
-                QuickReplyItem(action=MessageAction(label="🙏 ไหว้พระ",     text="ไหว้พระในท่ายาง")),
-                QuickReplyItem(action=MessageAction(label="📸 ถ่ายรูป",      text="ถ่ายรูปในท่ายาง")),
-                QuickReplyItem(action=MessageAction(label="🐟 ให้อาหารปลา", text="ให้อาหารปลาในท่ายาง")),
-                QuickReplyItem(action=MessageAction(label="🍜 ตะลอนกิน",    text="ตะลอนกินในท่ายาง")),
-            ])
-        )
+        _text("🧭 กิจกรรมแนะนำในอำเภอท่ายาง\nเลือกกิจกรรมที่สนใจได้เลยค่ะ 👇"),
+        FlexMessage(
+            alt_text="กิจกรรมในอำเภอท่ายาง",
+            contents=FlexContainer.from_dict({
+                "type": "carousel",
+                "contents": bubbles,
+            }),
+        ),
     ])
 
 
@@ -1047,7 +1193,6 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t.startswith("ร้าน "):
                 send_restaurant_detail_by_name(api, event, t[len("ร้าน "):])
 
-            # ✅ แก้ไขหลัก: เพิ่ม route จับ prefix "รายละเอียด" ที่ปุ่ม "ดูรายละเอียด" ส่งมา
             elif t.startswith("รายละเอียด"):
                 place_name = t.replace("รายละเอียด", "", 1).strip()
                 send_place_detail(api, event, place_name)
