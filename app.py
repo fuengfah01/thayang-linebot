@@ -165,7 +165,8 @@ def _flex_place_bubble(name, highlight, image_url, open_time, close_time, map_ur
     footer_contents.append({
         "type": "button", "style": "secondary", "height": "sm",
         "margin": "sm" if map_url else "none",
-        "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": name}
+        # ✅ แก้ไข: ใช้ prefix "รายละเอียด" แทน text ชื่อเปล่า เพื่อให้ route จับได้
+        "action": {"type": "message", "label": "📖 ดูรายละเอียด", "text": f"รายละเอียด{name}"}
     })
 
     bubble = {
@@ -1046,6 +1047,11 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t.startswith("ร้าน "):
                 send_restaurant_detail_by_name(api, event, t[len("ร้าน "):])
 
+            # ✅ แก้ไขหลัก: เพิ่ม route จับ prefix "รายละเอียด" ที่ปุ่ม "ดูรายละเอียด" ส่งมา
+            elif t.startswith("รายละเอียด"):
+                place_name = t.replace("รายละเอียด", "", 1).strip()
+                send_place_detail(api, event, place_name)
+
             elif t.startswith("หมวด "):
                 send_food_menu_list(api, event, t[len("หมวด "):])
 
@@ -1082,7 +1088,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 culture_text = get_about(key) if key else ""
                 _push(api, user_id, [_text(culture_text if culture_text else "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
 
-            # ── place detail ──
+            # ── place detail (legacy places dict) ──
             elif t in places and t != "แผนที่อำเภอท่ายาง":
                 send_place_detail(api, event, t)
 
