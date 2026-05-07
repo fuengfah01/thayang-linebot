@@ -15,7 +15,6 @@ from db import (
     get_all_souvenirs, get_about, get_restaurant_detail,
     get_all_activities,
 )
-from places import places
 from ai_helper import ask_ai
 from dialogflow_handler import detect_intent
 
@@ -602,21 +601,6 @@ def send_place_detail(api, event, name):
             if p.get("open_time") and p.get("close_time"):
                 msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
             _push(api, user_id, [_text(msg)])
-        return
-
-    if name in places:
-        p_legacy = places[name]
-        msgs = []
-        if p_legacy.get("images"):
-            msgs.append(_image(p_legacy["images"][0]))
-        msgs.append(_text(f"📍 {name}\n\n📖 {p_legacy.get('history', '')}"))
-        detail = f"⭐ จุดเด่น\n{p_legacy.get('highlight', '')}"
-        if p_legacy.get("time"):
-            detail += f"\n\n🕐 เวลา {p_legacy['time']} น."
-        if p_legacy.get("map"):
-            detail += f"\n\n🗺 {p_legacy['map']}"
-        msgs.append(_text(detail))
-        _push(api, user_id, msgs)
         return
 
     _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {name} ค่ะ")])
@@ -1228,10 +1212,6 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 key = CULTURE_KEY_MAP.get(place_name)
                 culture_text = get_about(key) if key else ""
                 _push(api, user_id, [_text(culture_text if culture_text else "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
-
-            # ── place detail (legacy places dict) ──
-            elif t in places and t != "แผนที่อำเภอท่ายาง":
-                send_place_detail(api, event, t)
 
             # ── open/close time ──
             elif t.startswith("เวลาเปิดปิดของ"):
