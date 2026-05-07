@@ -814,6 +814,12 @@ def _load_activity_images():
 
 
 def _flex_activity_bubble(card: dict) -> dict:
+    """
+    สร้าง Flex Bubble การ์ดกิจกรรม 1 ใบ
+    - hero:  รูปภาพ (ถ้ามี image_url)
+    - body:  emoji + ชื่อ + subtitle + รายชื่อสถานที่พร้อมปุ่มแผนที่
+    ไม่มี footer (ลบปุ่ม "ดูรายละเอียดทั้งหมด" ออกแล้ว)
+    """
     image_url = card.get("image_url", "")
 
     place_rows = []
@@ -888,24 +894,7 @@ def _flex_activity_bubble(card: dict) -> dict:
                 *place_rows,
             ],
         },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "paddingAll": "12px",
-            "contents": [
-                {
-                    "type": "button",
-                    "style": "primary",
-                    "color": card["color"],
-                    "height": "sm",
-                    "action": {
-                        "type": "message",
-                        "label": "ดูรายละเอียดทั้งหมด",
-                        "text": card["key"],
-                    },
-                }
-            ],
-        },
+        # ── ไม่มี footer ── ปุ่ม "ดูรายละเอียดทั้งหมด" ถูกลบออกแล้ว
     }
 
     if image_url:
