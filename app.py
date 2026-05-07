@@ -1357,6 +1357,10 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             else:
                                 send_places(api, event)
 
+                        # ── shop (ของฝาก) ──
+                        elif intent == "shop":
+                            send_souvenirs(api, event)
+
                         # ── place.opentime ──
                         elif intent == "place.opentime":
                             mode = _detect_time_mode(t)
