@@ -814,12 +814,6 @@ def _load_activity_images():
 
 
 def _flex_activity_bubble(card: dict) -> dict:
-    """
-    สร้าง Flex Bubble การ์ดกิจกรรม 1 ใบ
-    - hero:  รูปภาพ (ถ้ามี image_url)
-    - body:  emoji + ชื่อ + subtitle + รายชื่อสถานที่พร้อมปุ่มแผนที่
-    ไม่มี footer (ลบปุ่ม "ดูรายละเอียดทั้งหมด" ออกแล้ว)
-    """
     image_url = card.get("image_url", "")
 
     place_rows = []
@@ -894,7 +888,6 @@ def _flex_activity_bubble(card: dict) -> dict:
                 *place_rows,
             ],
         },
-        # ── ไม่มี footer ── ปุ่ม "ดูรายละเอียดทั้งหมด" ถูกลบออกแล้ว
     }
 
     if image_url:
@@ -1309,24 +1302,44 @@ def _process_message(reply_token: str, text: str, user_id: str):
                     params     = result["parameters"]
                     place_name = str(params.get("place-name", "")).strip()
                     confidence = result["confidence"]
-                    print(f"[DIALOGFLOW] intent={intent} confidence={confidence} place={repr(place_name)}")
+                    print(f"[DIALOGFLOW] intent={repr(intent)} confidence={confidence} place={repr(place_name)}")
 
                     if confidence > 0.5:
-                        if intent == "recommend_place":
+                        # ── greeting ──
+                        if intent in ["greeting", "Default Welcome Intent"]:
+                            greetings = [
+                                "สวัสดีค่ะ น้องเพชรผู้ช่วยตอบคำถามในอำเภอท่ายาง ยินดีให้บริการค่ะ 😊",
+                                "สวัสดีค่ะ น้องเพชรพร้อมช่วยแนะนำสถานที่ท่องเที่ยวในท่ายางแล้วค่ะ ✨",
+                                "สวัสดีค่ะ! น้องเพชรผู้ช่วยของคุณอยู่ที่นี่ พร้อมให้คำตอบทุกคำถามค่ะ 🌟",
+                            ]
+                            _push(api, user_id, [_text(random.choice(greetings))])
+
+                        # ── recommend_place ──
+                        elif intent == "recommend_place":
                             send_places(api, event)
+
+                        # ── place.eat ──
                         elif intent == "place.eat":
                             send_restaurants(api, event)
-                        elif intent == "place.search" and place_name:
-                            p = search_place(place_name)
-                            if p:
-                                msg = f"📍 {p['place_name']}\n\n📖 {p['place_description']}"
-                                if p.get("open_time"):
-                                    msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
-                                _push(api, user_id, [_text(msg)])
-                            elif place_name in places:
-                                send_place_detail(api, event, place_name)
+
+                        # ── place.search ──
+                        elif intent == "place.search":
+                            if place_name:
+                                p = search_place(place_name)
+                                if p:
+                                    msg = f"📍 {p['place_name']}\n\n📖 {p['place_description']}"
+                                    if p.get("open_time"):
+                                        msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
+                                    _push(api, user_id, [_text(msg)])
+                                elif place_name in places:
+                                    send_place_detail(api, event, place_name)
+                                else:
+                                    _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
                             else:
-                                _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+                                # ไม่รู้ชื่อสถานที่ แสดงรายการทั้งหมด
+                                send_places(api, event)
+
+                        # ── place.opentime ──
                         elif intent == "place.opentime":
                             mode = _detect_time_mode(t)
                             if place_name:
@@ -1337,13 +1350,17 @@ def _process_message(reply_token: str, text: str, user_id: str):
                                     _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
                             else:
                                 send_time_picker(api, user_id, mode, _detect_category_from_text(t))
+
+                        # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
                             p = search_place(t)
                             if p:
                                 send_place_detail(api, event, t)
                             else:
                                 _push(api, user_id, [_text(ask_ai(t))])
+
                     else:
+                        # confidence ต่ำ — ลองค้นสถานที่ก่อน ไม่เจอค่อยให้ AI ตอบ
                         p = search_place(t)
                         if p:
                             send_place_detail(api, event, t)
