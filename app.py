@@ -1304,6 +1304,36 @@ def _process_message(reply_token: str, text: str, user_id: str):
                     confidence = result["confidence"]
                     print(f"[DIALOGFLOW] intent={repr(intent)} confidence={confidence} place={repr(place_name)}")
 
+                    # ── แปลง place-name จาก list → string (IS LIST = true ใน Dialogflow) ──
+                    raw_place = params.get("place-name", "")
+                    if isinstance(raw_place, list):
+                        place_name = " ".join(raw_place).strip()
+                    else:
+                        place_name = str(raw_place).strip()
+
+                    def _fuzzy_search(query: str):
+                        """ค้นหาสถานที่แบบ fuzzy: ตรงก่อน → partial match → ค้นจาก text ที่ user พิม"""
+                        # 1. ค้นตรงๆ
+                        p = search_place(query)
+                        if p:
+                            return p
+                        # 2. หาชื่อใน DB ที่ query เป็น substring หรือกลับกัน
+                        all_names = get_all_place_names()
+                        matched = next(
+                            (n for n in all_names if n in query or query in n),
+                            None
+                        )
+                        if matched:
+                            return search_place(matched)
+                        # 3. ลองค้นจากข้อความที่ user พิมโดยตรง
+                        matched2 = next(
+                            (n for n in all_names if n in t or t in n),
+                            None
+                        )
+                        if matched2:
+                            return search_place(matched2)
+                        return None
+
                     if confidence > 0.5:
                         # ── greeting ──
                         if intent in ["greeting", "Default Welcome Intent"]:
@@ -1325,25 +1355,33 @@ def _process_message(reply_token: str, text: str, user_id: str):
                         # ── place.search ──
                         elif intent == "place.search":
                             if place_name:
-                                p = search_place(place_name)
+                                p = _fuzzy_search(place_name)
                                 if p:
-                                    msg = f"📍 {p['place_name']}\n\n📖 {p['place_description']}"
-                                    if p.get("open_time"):
-                                        msg += f"\n\n🕐 เปิด {p['open_time']} - {p['close_time']} น."
-                                    _push(api, user_id, [_text(msg)])
-                                elif place_name in places:
-                                    send_place_detail(api, event, place_name)
+                                    send_place_detail(api, event, p["place_name"])
                                 else:
-                                    _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
+                                    # ลองค้นใน restaurant
+                                    row = get_restaurant_detail(place_name)
+                                    if not row:
+                                        # partial match restaurant
+                                        from db import get_restaurants_by_category
+                                        all_r = get_restaurants_by_category("อาหารคาว") + get_restaurants_by_category("อาหารหวาน")
+                                        matched_r = next(
+                                            (r for r in all_r if r["name"] in place_name or place_name in r["name"]),
+                                            None
+                                        )
+                                        row = matched_r
+                                    if row:
+                                        send_restaurant_detail_by_name(api, event, row["name"])
+                                    else:
+                                        _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลของ {place_name} ค่ะ")])
                             else:
-                                # ไม่รู้ชื่อสถานที่ แสดงรายการทั้งหมด
                                 send_places(api, event)
 
                         # ── place.opentime ──
                         elif intent == "place.opentime":
                             mode = _detect_time_mode(t)
                             if place_name:
-                                p = search_place(place_name)
+                                p = _fuzzy_search(place_name)
                                 if p:
                                     _reply_time_by_mode(api, user_id, p, mode)
                                 else:
@@ -1353,26 +1391,30 @@ def _process_message(reply_token: str, text: str, user_id: str):
 
                         # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
-                            p = search_place(t)
+                            p = _fuzzy_search(t)
                             if p:
-                                send_place_detail(api, event, t)
+                                send_place_detail(api, event, p["place_name"])
                             else:
                                 _push(api, user_id, [_text(ask_ai(t))])
 
                     else:
                         # confidence ต่ำ — ลองค้นสถานที่ก่อน ไม่เจอค่อยให้ AI ตอบ
-                        p = search_place(t)
+                        all_names = get_all_place_names()
+                        matched = next((n for n in all_names if n in t or t in n), None)
+                        p = search_place(matched) if matched else search_place(t)
                         if p:
-                            send_place_detail(api, event, t)
+                            send_place_detail(api, event, p["place_name"])
                         else:
                             _push(api, user_id, [_text(ask_ai(t))])
 
                 except Exception as e:
                     print(f"[DIALOGFLOW ERROR] {e}")
                     import traceback; traceback.print_exc()
-                    p = search_place(t)
+                    all_names = get_all_place_names()
+                    matched = next((n for n in all_names if n in t or t in n), None)
+                    p = search_place(matched) if matched else search_place(t)
                     if p:
-                        send_place_detail(api, event, t)
+                        send_place_detail(api, event, p["place_name"])
                     else:
                         _push(api, user_id, [_text(ask_ai(t))])
 
