@@ -1160,7 +1160,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
 
-            elif t in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
+            elif t in ["map", "แผนที่", "แผนที่ภายในอำเภอท่ายาง", "ดูแผนที่"]:
                 send_map(api, event)
 
             elif t in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
