@@ -1373,24 +1373,17 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             else:
                                 send_time_picker(api, user_id, mode, _detect_category_from_text(t))
 
-                        # ── season.best: ช่วงเวลาที่ควรมาเที่ยว ──
+                        # ── season.best: ช่วงเวลาที่ควรมาเที่ยว (ใช้ response จาก Dialogflow) ──
                         elif intent == "season.best":
-                            _push(api, user_id, [_text(
-                                "🌤 ช่วงเวลาแนะนำมาเที่ยวท่ายาง\n\n"
-                                "✅ พ.ย. - ก.พ. → อากาศเย็นสบาย ดีที่สุดค่ะ\n"
-                                "⚠️ มี.ค. - พ.ค. → ร้อน แต่เที่ยวได้ค่ะ\n"
-                                "🌧 มิ.ย. - ต.ค. → ฤดูฝน บางที่อาจปิดค่ะ"
-                            )])
+                            msg = result.get("fulfillment_text", "").strip()
+                            if msg:
+                                _push(api, user_id, [_text(msg)])
 
-                        # ── tradition.info: ประเพณีและเทศกาล ──
+                        # ── tradition.info: ประเพณีและเทศกาล (ใช้ response จาก Dialogflow) ──
                         elif intent == "tradition.info":
-                            _push(api, user_id, [_text(
-                                "🎊 ประเพณีและเทศกาลในท่ายาง\n\n"
-                                "• งานลอยกระทง (พ.ย.)\n"
-                                "• งานวัดท้องถิ่น ช่วงออกพรรษา (ต.ค.)\n"
-                                "• งานวิถีชุมชนท่าเพชร\n\n"
-                                "ติดตามข่าวสารเพิ่มเติมได้ที่เพจชุมชนค่ะ 😊"
-                            )])
+                            msg = result.get("fulfillment_text", "").strip()
+                            if msg:
+                                _push(api, user_id, [_text(msg)])
 
                         # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
