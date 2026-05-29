@@ -1398,6 +1398,18 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             if msg:
                                 _push(api, user_id, [_text(msg)])
 
+                        # ── distance.info: ระยะทาง/เส้นทางมาท่ายาง ──
+                        elif intent == "distance.info":
+                            msg = result.get("fulfillment_text", "").strip()
+                            if msg:
+                                _push(api, user_id, [_text(msg)])
+                            else:
+                                _push(api, user_id, [_text(
+                                    "🚗 อำเภอท่ายางอยู่ห่างจากกรุงเทพฯ ประมาณ 160 กม. "
+                                    "ใช้เวลาขับรถประมาณ 2-2.5 ชั่วโมง ผ่านทางหลวงหมายเลข 4 (เพชรเกษม) ค่ะ\n\n"
+                                    "📍 ต้องการทราบระยะทางจากจุดไหนเป็นพิเศษไหมคะ?"
+                                )])
+
                         # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
                             p = _fuzzy_search(t)
