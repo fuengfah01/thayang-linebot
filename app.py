@@ -1418,6 +1418,14 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             if msg:
                                 _push(api, user_id, [_text(msg)])
 
+                        # ── main.activity: กิจกรรมในท่ายาง ──
+                        elif intent == "main.activity":
+                            send_activity(api, event)
+
+                        # ── main.map: แผนที่สถานที่ในท่ายาง ──
+                        elif intent == "main.map":
+                            send_map(api, event)
+
                         # ── tradition.info: ประเพณีและเทศกาล (ใช้ response จาก Dialogflow) ──
                         elif intent == "tradition.info":
                             msg = result.get("fulfillment_text", "").strip()
