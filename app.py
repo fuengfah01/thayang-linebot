@@ -114,26 +114,50 @@ souvenirs = {
 # =========================
 # 🛠 HELPERS
 # =========================
-def _push(api, user_id: str, messages: list):
+
+# reply_token ใช้ได้ครั้งเดียวและหมดอายุใน ~1 นาที
+# เก็บไว้ใน dict เพื่อให้ฟังก์ชันแรกที่ตอบกลับใช้ reply (ฟรี) แล้วที่เหลือ fallback เป็น push
+_reply_token_store: dict = {}
+
+
+def _send(api, user_id: str, messages: list, reply_token: str = None):
+    """
+    ส่งข้อความโดยใช้ reply_message ก่อน (ไม่กิน quota)
+    ถ้าใช้ reply ไม่ได้แล้ว (token ใช้ไปแล้ว/หมดอายุ) ค่อย fallback เป็น push_message
+    """
+    if not messages:
+        return
+
+    msgs = messages[:5]
+
+    # ลองใช้ reply_token ก่อน (ฟรี ไม่กิน quota)
+    token = reply_token or _reply_token_store.pop(user_id, None)
+    if token:
+        try:
+            api.reply_message(ReplyMessageRequest(reply_token=token, messages=msgs))
+            print(f"[REPLY OK] user={user_id} msgs={len(msgs)}")
+            return
+        except Exception as e:
+            print(f"[REPLY FAIL → fallback push] {e}")
+
+    # fallback: push_message (กิน quota แต่ใช้เมื่อ reply token หมดอายุแล้ว)
     try:
-        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
+        api.push_message(PushMessageRequest(to=user_id, messages=msgs))
+        print(f"[PUSH OK] user={user_id} msgs={len(msgs)}")
     except Exception as e:
         print(f"[PUSH FAIL] {e}")
         import traceback; traceback.print_exc()
 
 
+def _push(api, user_id: str, messages: list):
+    """Backward-compat wrapper — ใช้ reply ก่อน push เสมอ"""
+    _send(api, user_id, messages)
+
+
 def _reply(api, event, messages: list):
-    try:
-        user_id = event.source.user_id
-        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
-    except Exception as e:
-        print(f"[PUSH FAIL] {e}")
-        try:
-            api.reply_message(
-                ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
-            )
-        except Exception as e2:
-            print(f"[REPLY FAIL] {e2}")
+    """ส่งโดยใช้ reply_token ของ event นี้"""
+    user_id = event.source.user_id
+    _send(api, user_id, messages, reply_token=event.reply_token)
 
 
 def _text(msg: str) -> TextMessage:
@@ -1307,6 +1331,8 @@ def handle_message(event):
     text        = event.message.text.strip()
     user_id     = event.source.user_id
     print(f"[HANDLE_MESSAGE] user={user_id} text={repr(text)}")
+    # เก็บ reply_token ไว้ให้ thread ใช้ (reply ฟรี ไม่กิน quota)
+    _reply_token_store[user_id] = reply_token
     threading.Thread(
         target=_process_message,
         args=(reply_token, text, user_id),
