@@ -1204,7 +1204,33 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 place_name = t.replace("แผนที่ ", "", 1)
                 p = search_place(place_name)
                 if p and p.get("map_url"):
-                    _push(api, user_id, [_text(f"🗺 แผนที่ {p['place_name']}\n{p['map_url']}")])
+                    bubble = {
+                        "type": "bubble",
+                        "body": {
+                            "type": "box", "layout": "vertical", "spacing": "sm",
+                            "contents": [
+                                {"type": "text", "text": p["place_name"], "weight": "bold", "size": "lg", "wrap": True},
+                                {"type": "text", "text": p.get("highlight") or p.get("place_description") or "",
+                                 "size": "sm", "color": "#666666", "wrap": True, "maxLines": 3},
+                            ]
+                        },
+                        "footer": {
+                            "type": "box", "layout": "vertical",
+                            "contents": [{
+                                "type": "button", "style": "primary", "color": "#2d7a3a", "height": "sm",
+                                "action": {"type": "uri", "label": "🗺 เปิดแผนที่", "uri": _safe_uri(p["map_url"])}
+                            }]
+                        }
+                    }
+                    if p.get("cover_image"):
+                        bubble["hero"] = {
+                            "type": "image", "url": p["cover_image"],
+                            "size": "full", "aspectRatio": "20:13", "aspectMode": "cover"
+                        }
+                    _push(api, user_id, [FlexMessage(
+                        alt_text=f"แผนที่ {p['place_name']}",
+                        contents=FlexContainer.from_dict(bubble)
+                    )])
                 else:
                     _push(api, user_id, [_text("ขอโทษค่ะ ไม่พบข้อมูลแผนที่ค่ะ")])
 
