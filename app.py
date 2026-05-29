@@ -905,10 +905,18 @@ def send_activity(api, event):
 # 📖 INFO
 # =========================
 INFO_KEY_MAP = {
-    "ประวัติท่ายาง":   "history",
+    # แบบเต็ม
     "จุดเด่นท่ายาง":   "highlight",
     "วิถีชีวิตท่ายาง": "lifestyle",
+    "วัฒนธรรมท่ายาง":  "culture",
     "ติดต่อท่ายาง":    "contact",
+    # แบบย่อ
+    "จุดเด่น":         "highlight",
+    "วิถีชีวิต":       "lifestyle",
+    "วิถีชุมชน":       "lifestyle",
+    "วัฒนธรรม":        "culture",
+    "ติดต่อ":          "contact",
+    "ติดต่อเรา":       "contact",
 }
 CULTURE_KEY_MAP = {
     "วัดท่าคอย":            "culture_wat_takhoi",
@@ -930,7 +938,6 @@ def send_info(api, event):
         TextMessage(
             text="👇 กดเลือกหัวข้อที่สนใจได้เลยค่ะ",
             quick_reply=QuickReply(items=[
-                QuickReplyItem(action=MessageAction(label="📜 ประวัติ",   text="ประวัติท่ายาง")),
                 QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น",   text="จุดเด่นท่ายาง")),
                 QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="วิถีชีวิตท่ายาง")),
                 QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="วัฒนธรรมท่ายาง")),
@@ -1378,11 +1385,38 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             if msg:
                                 _push(api, user_id, [_text(msg)])
 
-                        # ── tradition.info: ประเพณีและเทศกาล (ใช้ response จาก Dialogflow) ──
+                        # ── tradition.info: ประเพณี วิถีชีวิต ประวัติ ──
                         elif intent == "tradition.info":
-                            msg = result.get("fulfillment_text", "").strip()
-                            if msg:
-                                _push(api, user_id, [_text(msg)])
+                            keyword_map = {
+                                "วิถีชีวิต": "lifestyle",
+                                "วิถีชุมชน": "lifestyle",
+                                "วัฒนธรรม":  "culture",
+                                "จุดเด่น":   "highlight",
+                                "ติดต่อ":    "contact",
+                            }
+                            section = next(
+                                (v for k, v in keyword_map.items() if k in t),
+                                None
+                            )
+                            if section:
+                                content = get_about(section)
+                                if content:
+                                    _push(api, user_id, [_text(content)])
+                                else:
+                                    _push(api, user_id, [_text("ขอโทษค่ะ ยังไม่มีข้อมูลนี้ค่ะ 🙏")])
+                            else:
+                                # ไม่รู้ว่าถามเรื่องไหน ให้เลือก
+                                _push(api, user_id, [
+                                    TextMessage(
+                                        text="สนใจเรื่องไหนของท่ายางคะ? 😊",
+                                        quick_reply=QuickReply(items=[
+                                            QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น",   text="จุดเด่นท่ายาง")),
+                                            QuickReplyItem(action=MessageAction(label="🌿 วิถีชีวิต", text="วิถีชีวิตท่ายาง")),
+                                            QuickReplyItem(action=MessageAction(label="🛕 วัฒนธรรม", text="วัฒนธรรมท่ายาง")),
+                                            QuickReplyItem(action=MessageAction(label="📞 ติดต่อเรา", text="ติดต่อท่ายาง")),
+                                        ])
+                                    )
+                                ])
 
                         # ── distance.info: ระยะทาง/การเดินทาง ──
                         elif intent == "distance.info":
