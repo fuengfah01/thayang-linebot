@@ -641,21 +641,16 @@ def send_eat_places(api, user_id: str):
 
 
 def send_restaurants(api, event):
-    quick_reply = QuickReply(items=[
-        QuickReplyItem(action=MessageAction(label="🍜 อาหารคาว", text="อาหารคาว")),
-        QuickReplyItem(action=MessageAction(label="🍮 อาหารหวาน", text="อาหารหวาน")),
-    ])
-    msg = TextMessage(
-        text="อยากกินอะไรดีคะ? 😊\nเลือกประเภทอาหารได้เลยค่ะ",
-        quick_reply=quick_reply
-    )
-    try:
-        api.reply_message(
-            ReplyMessageRequest(reply_token=event.reply_token, messages=[msg])
+    user_id = event.source.user_id
+    _push(api, user_id, [
+        TextMessage(
+            text="อยากกินอะไรดีคะ? 😊\nเลือกประเภทอาหารได้เลยค่ะ",
+            quick_reply=QuickReply(items=[
+                QuickReplyItem(action=MessageAction(label="🍜 อาหารคาว", text="อาหารคาว")),
+                QuickReplyItem(action=MessageAction(label="🍮 อาหารหวาน", text="อาหารหวาน")),
+            ])
         )
-    except Exception as e:
-        print(f"[REST ERROR] quick reply: {e}")
-        import traceback; traceback.print_exc()
+    ])
 
 
 def send_souvenirs(api, event):
