@@ -1206,7 +1206,8 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 _push(api, user_id, [_text(activity_details[t])])
 
             elif t == "วัฒนธรรมท่ายาง":
-                send_culture(api, event)
+                content_text = get_about("culture")
+                _push(api, user_id, [_text(content_text if content_text else "ขอโทษค่ะ ยังไม่มีข้อมูลนี้ค่ะ")])
 
             # ── about / info ──
             elif t in INFO_KEY_MAP:
