@@ -15,7 +15,6 @@ from db import (
     get_all_souvenirs, get_about, get_restaurant_detail,
     get_all_activities,
 )
-from ai_helper import ask_ai
 from dialogflow_handler import detect_intent
 
 import random
@@ -1160,7 +1159,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
             elif t in ["activity", "กิจกรรมภายในอำเภอท่ายาง"]:
                 send_activity(api, event)
 
-            elif t in ["map", "แผนที่", "แผนที่ภายในอำเภอท่ายาง", "ดูแผนที่"]:
+            elif t in ["map", "แผนที่ภายในอำเภอท่ายาง"]:
                 send_map(api, event)
 
             elif t in ["souvenir", "ของฝาก", "ของฝากในอำเภอท่ายาง"]:
@@ -1385,23 +1384,39 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             if msg:
                                 _push(api, user_id, [_text(msg)])
 
+                        # ── distance.info: ระยะทาง/การเดินทาง ──
+                        elif intent == "distance.info":
+                            msg = result.get("fulfillment_text", "").strip()
+                            if msg:
+                                _push(api, user_id, [_text(msg)])
+                            else:
+                                _push(api, user_id, [_text(
+                                    "🚗 อำเภอท่ายางอยู่ห่างจากกรุงเทพฯ ประมาณ 160 กม. "
+                                    "ใช้เวลาขับรถประมาณ 2-2.5 ชั่วโมง ผ่านทางหลวงหมายเลข 4 (เพชรเกษม) ค่ะ\n\n"
+                                    "📍 ต้องการทราบระยะทางจากจุดไหนเป็นพิเศษไหมคะ?"
+                                )])
+
                         # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
                             p = _fuzzy_search(t)
                             if p:
                                 send_place_detail(api, event, p["place_name"])
                             else:
-                                _push(api, user_id, [_text(ask_ai(t))])
+                                _push(api, user_id, [_text(
+                                    "ขอโทษค่ะ ไม่เข้าใจคำถาม ลองพิมพ์ใหม่หรือเลือกจากเมนูได้เลยค่ะ 😊"
+                                )])
 
                     else:
-                        # confidence ต่ำ — ลองค้นสถานที่ก่อน ไม่เจอค่อยให้ AI ตอบ
+                        # confidence ต่ำ — ลองค้นสถานที่ก่อน ไม่เจอค่อยตอบ fallback
                         all_names = get_all_place_names()
                         matched = next((n for n in all_names if n in t or t in n), None)
                         p = search_place(matched) if matched else search_place(t)
                         if p:
                             send_place_detail(api, event, p["place_name"])
                         else:
-                            _push(api, user_id, [_text(ask_ai(t))])
+                            _push(api, user_id, [_text(
+                                "ขอโทษค่ะ ไม่เข้าใจคำถาม ลองพิมพ์ใหม่หรือเลือกจากเมนูได้เลยค่ะ 😊"
+                            )])
 
                 except Exception as e:
                     print(f"[DIALOGFLOW ERROR] {e}")
@@ -1412,7 +1427,9 @@ def _process_message(reply_token: str, text: str, user_id: str):
                     if p:
                         send_place_detail(api, event, p["place_name"])
                     else:
-                        _push(api, user_id, [_text(ask_ai(t))])
+                        _push(api, user_id, [_text(
+                            "ขอโทษค่ะ ไม่เข้าใจคำถาม ลองพิมพ์ใหม่หรือเลือกจากเมนูได้เลยค่ะ 😊"
+                        )])
 
         except Exception as e:
             print(f"[ERROR] _process_message: {e}")
