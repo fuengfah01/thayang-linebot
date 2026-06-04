@@ -15,7 +15,6 @@ from db import (
     get_all_souvenirs, get_about, get_restaurant_detail,
     get_all_activities,
 )
-from ai_helper import ask_ai
 from dialogflow_handler import detect_intent
 
 import random
@@ -110,28 +109,42 @@ souvenirs = {
 # =========================
 # 🛠 HELPERS
 # =========================
-def _push(api, user_id: str, messages: list):
-    """Push message โดยตรงด้วย user_id"""
+
+# reply_token ใช้ได้ครั้งเดียวและหมดอายุใน ~1 นาที
+# เก็บไว้ใน dict เพื่อให้ฟังก์ชันแรกที่ตอบกลับใช้ reply (ฟรี) แล้วที่เหลือ fallback เป็น push
+_reply_token_store: dict = {}
+
+
+def _send(api, user_id: str, messages: list, reply_token: str = None):
+    """ใช้ reply_message ก่อน (ฟรี ไม่กิน quota) fallback เป็น push เมื่อจำเป็น"""
+    if not messages:
+        return
+    msgs = messages[:5]
+    token = reply_token or _reply_token_store.pop(user_id, None)
+    if token:
+        try:
+            api.reply_message(ReplyMessageRequest(reply_token=token, messages=msgs))
+            print(f"[REPLY OK] user={user_id} msgs={len(msgs)}")
+            return
+        except Exception as e:
+            print(f"[REPLY FAIL → fallback push] {e}")
     try:
-        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
+        api.push_message(PushMessageRequest(to=user_id, messages=msgs))
+        print(f"[PUSH OK] user={user_id} msgs={len(msgs)}")
     except Exception as e:
         print(f"[PUSH FAIL] {e}")
         import traceback; traceback.print_exc()
 
 
+def _push(api, user_id: str, messages: list):
+    """Backward-compat — ใช้ reply ก่อน push เสมอ"""
+    _send(api, user_id, messages)
+
+
 def _reply(api, event, messages: list):
-    """พยายาม push ก่อน ถ้าไม่ได้ค่อย reply"""
-    try:
-        user_id = event.source.user_id
-        api.push_message(PushMessageRequest(to=user_id, messages=messages[:5]))
-    except Exception as e:
-        print(f"[PUSH FAIL] {e}")
-        try:
-            api.reply_message(
-                ReplyMessageRequest(reply_token=event.reply_token, messages=messages[:5])
-            )
-        except Exception as e2:
-            print(f"[REPLY FAIL] {e2}")
+    """ส่งโดยใช้ reply_token ของ event นี้"""
+    user_id = event.source.user_id
+    _send(api, user_id, messages, reply_token=event.reply_token)
 
 
 def _text(msg: str) -> TextMessage:
@@ -1373,13 +1386,25 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             else:
                                 send_time_picker(api, user_id, mode, _detect_category_from_text(t))
 
+                        # ── season.best: ช่วงเวลาที่ควรมาเที่ยว (ใช้ response จาก Dialogflow) ──
+                        elif intent == "season.best":
+                            msg = result.get("fulfillment_text", "").strip()
+                            if msg:
+                                _push(api, user_id, [_text(msg)])
+
+                        # ── tradition.info: ประเพณีและเทศกาล (ใช้ response จาก Dialogflow) ──
+                        elif intent == "tradition.info":
+                            msg = result.get("fulfillment_text", "").strip()
+                            if msg:
+                                _push(api, user_id, [_text(msg)])
+
                         # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
                             p = _fuzzy_search(t)
                             if p:
                                 send_place_detail(api, event, p["place_name"])
                             else:
-                                _push(api, user_id, [_text(ask_ai(t))])
+                                _push(api, user_id, [_text("ขอโทษค่ะ ไม่เข้าใจคำถาม ลองพิมพ์ใหม่หรือเลือกจากเมนูได้เลยค่ะ 😊")])
 
                     else:
                         # confidence ต่ำ — ลองค้นสถานที่ก่อน ไม่เจอค่อยให้ AI ตอบ
@@ -1389,7 +1414,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
                         if p:
                             send_place_detail(api, event, p["place_name"])
                         else:
-                            _push(api, user_id, [_text(ask_ai(t))])
+                            _push(api, user_id, [_text("ขอโทษค่ะ ไม่เข้าใจคำถาม ลองพิมพ์ใหม่หรือเลือกจากเมนูได้เลยค่ะ 😊")])
 
                 except Exception as e:
                     print(f"[DIALOGFLOW ERROR] {e}")
@@ -1400,7 +1425,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
                     if p:
                         send_place_detail(api, event, p["place_name"])
                     else:
-                        _push(api, user_id, [_text(ask_ai(t))])
+                        _push(api, user_id, [_text("ขอโทษค่ะ ไม่เข้าใจคำถาม ลองพิมพ์ใหม่หรือเลือกจากเมนูได้เลยค่ะ 😊")])
 
         except Exception as e:
             print(f"[ERROR] _process_message: {e}")
@@ -1416,6 +1441,8 @@ def handle_message(event):
     text        = event.message.text.strip()
     user_id     = event.source.user_id
     print(f"[HANDLE_MESSAGE] user={user_id} text={repr(text)}")
+    # เก็บ reply_token ก่อน spawn thread — ให้ _send() ใช้ reply (ฟรี) ได้
+    _reply_token_store[user_id] = reply_token
     threading.Thread(
         target=_process_message,
         args=(reply_token, text, user_id),
