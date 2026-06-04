@@ -1373,18 +1373,6 @@ def _process_message(reply_token: str, text: str, user_id: str):
                             else:
                                 send_time_picker(api, user_id, mode, _detect_category_from_text(t))
 
-                        # ── season.best: ช่วงเวลาที่ควรมาเที่ยว (ใช้ response จาก Dialogflow) ──
-                        elif intent == "season.best":
-                            msg = result.get("fulfillment_text", "").strip()
-                            if msg:
-                                _push(api, user_id, [_text(msg)])
-
-                        # ── tradition.info: ประเพณีและเทศกาล (ใช้ response จาก Dialogflow) ──
-                        elif intent == "tradition.info":
-                            msg = result.get("fulfillment_text", "").strip()
-                            if msg:
-                                _push(api, user_id, [_text(msg)])
-
                         # ── intent อื่นๆ ที่ไม่รู้จัก ──
                         else:
                             p = _fuzzy_search(t)
