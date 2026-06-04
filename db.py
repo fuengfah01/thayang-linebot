@@ -1,16 +1,20 @@
+import os
 import mysql.connector
 from mysql.connector import Error
 from urllib.parse import quote_plus
-DB_CONFIG = {
-    "host": "sql12.freesqldatabase.com",
-    "port": 3306,
-    "user": "sql12825543",
-    "password": "BiDtrBXwmJ",
-    "database": "sql12825543",
-    "connection_timeout": 8,
-    "connect_timeout": 8,
-    "autocommit": True,
-}
+
+def _get_db_config():
+    return {
+        "host":               os.environ.get("DB_HOST", "sql12.freesqldatabase.com"),
+        "port":               int(os.environ.get("DB_PORT", 3306)),
+        "user":               os.environ.get("DB_USER", "sql12825543"),
+        "password":           os.environ.get("DB_PASSWORD", "BiDtrBXwmJ"),
+        "database":           os.environ.get("DB_NAME", "sql12825543"),
+        "connection_timeout": 10,
+        "connect_timeout":    10,
+        "autocommit":         True,
+    }
+
 def _fix_map_url(row):
     if not row:
         return row
@@ -28,16 +32,18 @@ def _fix_map_url(row):
     except Exception as e:
         print(f"[MAP URL ERROR] {e}")
     return row
+
 def get_connection():
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        print(f"[DB] connection OK")
+        conn = mysql.connector.connect(**_get_db_config())
+        print("[DB] connection OK")
         return conn
     except Error as e:
         print(f"[DB ERROR] get_connection failed: {e}")
         raise
-# legacy alias
+
 get_conn = get_connection
+
 def _execute(sql, args=()):
     conn = None
     try:
@@ -50,12 +56,16 @@ def _execute(sql, args=()):
     except Error as e:
         print(f"[DB ERROR] query failed: {e} | sql={sql!r}")
         return []
+    except Exception as e:
+        print(f"[DB ERROR] unexpected: {e}")
+        return []
     finally:
         if conn:
             try:
                 conn.close()
             except Exception:
                 pass
+
 # =========================
 # chatbot_place
 # =========================
@@ -65,20 +75,22 @@ def search_place(keyword):
         (f"%{keyword}%",)
     )
     return _fix_map_url(rows[0]) if rows else None
+
 def get_places_by_category(category):
     rows = _execute(
         "SELECT * FROM chatbot_place WHERE category = %s ORDER BY place_id",
         (category,)
     )
     return [_fix_map_url(r) for r in rows]
+
 def get_all_place_names():
     rows = _execute("SELECT place_name FROM chatbot_place ORDER BY place_id")
     return [r["place_name"] for r in rows]
+
 # =========================
 # restaurant
 # =========================
-def get_restaurants_by_category(category, limit=6, offset=0):
-    """ดึงร้านอาหารตาม category รองรับ pagination ด้วย limit/offset"""
+def get_restaurants_by_category(category, limit=50, offset=0):
     print(f"[DB] get_restaurants_by_category: category={repr(category)} limit={limit} offset={offset}")
     rows = _execute(
         "SELECT * FROM restaurant WHERE category = %s ORDER BY restaurant_id LIMIT %s OFFSET %s",
@@ -86,25 +98,28 @@ def get_restaurants_by_category(category, limit=6, offset=0):
     )
     print(f"[DB] got {len(rows)} rows")
     return [_fix_map_url(r) for r in rows]
+
 def count_restaurants_by_category(category):
-    """นับจำนวนร้านอาหารทั้งหมดใน category"""
     rows = _execute(
         "SELECT COUNT(*) as total FROM restaurant WHERE category = %s",
         (category,)
     )
     return rows[0]["total"] if rows else 0
+
 def get_restaurant_detail(name: str):
     rows = _execute(
         "SELECT * FROM restaurant WHERE name = %s LIMIT 1",
         (name,)
     )
     return _fix_map_url(rows[0]) if rows else None
+
 # =========================
 # souvenir_shop
 # =========================
 def get_all_souvenirs():
     rows = _execute("SELECT * FROM souvenir_shop ORDER BY shop_id")
     return [_fix_map_url(r) for r in rows]
+
 # =========================
 # about_us
 # =========================
@@ -114,13 +129,14 @@ def get_about(section: str) -> str:
         (section,)
     )
     return rows[0]["content"] if rows else ""
+
 # =========================
 # activity
 # =========================
 def get_all_activities():
-    """ดึงข้อมูล activity ทั้งหมดจาก DB พร้อม image_url"""
     rows = _execute("SELECT * FROM activity ORDER BY activity_id")
     return rows
+
 # =========================
 # misc
 # =========================
