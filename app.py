@@ -1228,12 +1228,19 @@ def _process_message(reply_token: str, text: str, user_id: str):
                 _push(api, user_id, [_text(content_text)])
 
             elif t.startswith("วัฒนธรรม "):
-                place_name = t.replace("วัฒนธรรม ", "", 1)
-                key = CULTURE_KEY_MAP.get(place_name)
-                culture_text = get_about(key) if key else ""
-                if not culture_text:
-                    culture_text = f"ขอโทษค่ะ ยังไม่มีข้อมูลเกี่ยวกับ {place_name} ในขณะนี้ค่ะ"
-                _push(api, user_id, [_text(culture_text)])
+                place_name = t.replace("วัฒนธรรม ", "", 1).strip()
+                # ดึงจาก chatbot_place ก่อน (เหมือน place detail ปกติ)
+                p = search_place(place_name)
+                if p:
+                    send_place_detail(api, event, p["place_name"])
+                else:
+                    # fallback: ลองดึงจาก about_us (ถ้ามี)
+                    key = CULTURE_KEY_MAP.get(place_name)
+                    culture_text = get_about(key) if key else ""
+                    if culture_text:
+                        _push(api, user_id, [_text(culture_text)])
+                    else:
+                        _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลเกี่ยวกับ {place_name} ค่ะ")])
 
             # ── open/close time ──
             elif t.startswith("เวลาเปิดปิดของ"):
