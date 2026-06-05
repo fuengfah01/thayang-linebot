@@ -924,6 +924,12 @@ INFO_KEY_MAP = {
     "วิถีชีวิตท่ายาง": "lifestyle",
     "ติดต่อท่ายาง":    "contact",
 }
+INFO_FALLBACK = {
+    "history":   "📜 ประวัติอำเภอท่ายาง\n\nท่ายางเป็นอำเภอหนึ่งในจังหวัดเพชรบุรี มีประวัติศาสตร์ยาวนาน เป็นชุมชนที่มีความสำคัญทางการค้าและวัฒนธรรมของจังหวัดเพชรบุรีมาแต่โบราณ",
+    "highlight": "⭐ จุดเด่นอำเภอท่ายาง\n\n• วัดท่าคอย — วัดเก่าแก่อายุกว่า 100 ปี\n• อุทยานปลาวัดท่าคอย — ที่ให้อาหารปลาธรรมชาติ\n• ขนมหม้อแกง และทองม้วน ของฝากขึ้นชื่อ\n• ตลาดสดท่ายาง — ของสดและอาหารพื้นบ้าน",
+    "lifestyle": "🌿 วิถีชีวิตชาวท่ายาง\n\nชาวท่ายางส่วนใหญ่ประกอบอาชีพเกษตรกรรม ทำสวนผลไม้ และประมง มีวิถีชีวิตผูกพันกับธรรมชาติ และสืบทอดวัฒนธรรมขนมไทยจากรุ่นสู่รุ่น",
+    "contact":   "📞 ติดต่ออำเภอท่ายาง\n\n🏢 ที่ว่าการอำเภอท่ายาง\n📍 ถนนราษฎร์บำรุง ตำบลท่ายาง อำเภอท่ายาง จังหวัดเพชรบุรี 76130\n☎️ โทร: 032-771-011",
+}
 CULTURE_KEY_MAP = {
     "วัดท่าคอย":            "culture_wat_takhoi",
     "อุโบสถ 100 ปี":       "culture_ubosot",
@@ -940,9 +946,8 @@ CULTURE_KEY_MAP = {
 def send_info(api, event):
     user_id = event.source.user_id
     _push(api, user_id, [
-        _text("📖 เกี่ยวกับอำเภอท่ายาง"),
         TextMessage(
-            text="👇 กดเลือกหัวข้อที่สนใจได้เลยค่ะ",
+            text="📖 เกี่ยวกับอำเภอท่ายาง\n\n👇 กดเลือกหัวข้อที่สนใจได้เลยค่ะ",
             quick_reply=QuickReply(items=[
                 QuickReplyItem(action=MessageAction(label="📜 ประวัติ",   text="ประวัติท่ายาง")),
                 QuickReplyItem(action=MessageAction(label="⭐ จุดเด่น",   text="จุดเด่นท่ายาง")),
@@ -957,9 +962,8 @@ def send_info(api, event):
 def send_culture(api, event):
     user_id = event.source.user_id
     _push(api, user_id, [
-        _text("🏛️ วัฒนธรรมท่ายาง"),
         TextMessage(
-            text="👇 กดเลือกสถานที่/ร้านที่สนใจค่ะ",
+            text="🏛️ วัฒนธรรมท่ายาง\n\n👇 กดเลือกสถานที่/ร้านที่สนใจค่ะ",
             quick_reply=QuickReply(items=[
                 QuickReplyItem(action=MessageAction(label="วัดท่าคอย",         text="วัฒนธรรม วัดท่าคอย")),
                 QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี",     text="วัฒนธรรม อุโบสถ 100 ปี")),
@@ -1217,14 +1221,19 @@ def _process_message(reply_token: str, text: str, user_id: str):
 
             # ── about / info ──
             elif t in INFO_KEY_MAP:
-                content_text = get_about(INFO_KEY_MAP[t])
-                _push(api, user_id, [_text(content_text if content_text else "ขอโทษค่ะ ยังไม่มีข้อมูลนี้ค่ะ")])
+                section_key = INFO_KEY_MAP[t]
+                content_text = get_about(section_key)
+                if not content_text:
+                    content_text = INFO_FALLBACK.get(section_key, "ขอโทษค่ะ ยังไม่มีข้อมูลนี้ค่ะ")
+                _push(api, user_id, [_text(content_text)])
 
             elif t.startswith("วัฒนธรรม "):
                 place_name = t.replace("วัฒนธรรม ", "", 1)
                 key = CULTURE_KEY_MAP.get(place_name)
                 culture_text = get_about(key) if key else ""
-                _push(api, user_id, [_text(culture_text if culture_text else "ขอโทษค่ะ ไม่พบข้อมูลนี้ค่ะ")])
+                if not culture_text:
+                    culture_text = f"ขอโทษค่ะ ยังไม่มีข้อมูลเกี่ยวกับ {place_name} ในขณะนี้ค่ะ"
+                _push(api, user_id, [_text(culture_text)])
 
             # ── open/close time ──
             elif t.startswith("เวลาเปิดปิดของ"):
