@@ -961,22 +961,10 @@ def send_info(api, event):
 
 def send_culture(api, event):
     user_id = event.source.user_id
-    _push(api, user_id, [
-        TextMessage(
-            text="🏛️ วัฒนธรรมท่ายาง\n\n👇 กดเลือกสถานที่/ร้านที่สนใจค่ะ",
-            quick_reply=QuickReply(items=[
-                QuickReplyItem(action=MessageAction(label="วัดท่าคอย",         text="วัฒนธรรม วัดท่าคอย")),
-                QuickReplyItem(action=MessageAction(label="อุโบสถ 100 ปี",     text="วัฒนธรรม อุโบสถ 100 ปี")),
-                QuickReplyItem(action=MessageAction(label="อุทยานปลา",         text="วัฒนธรรม อุทยานปลาวัดท่าคอย")),
-                QuickReplyItem(action=MessageAction(label="ตลาดสดท่ายาง",     text="วัฒนธรรม ตลาดสดท่ายาง")),
-                QuickReplyItem(action=MessageAction(label="ทองม้วนแม่เล็ก",   text="วัฒนธรรม ร้านทองม้วนแม่เล็ก")),
-                QuickReplyItem(action=MessageAction(label="ผัดไทย 100 ปี",    text="วัฒนธรรม ร้านผัดไทย 100 ปี")),
-                QuickReplyItem(action=MessageAction(label="ศาลเจ้าพ่อกวนอู",  text="วัฒนธรรม ศาลเจ้าพ่อกวนอู")),
-                QuickReplyItem(action=MessageAction(label="ข้าวแช่แม่เล็ก",   text="วัฒนธรรม ข้าวแช่แม่เล็ก")),
-                QuickReplyItem(action=MessageAction(label="ศาลเจ้าแม่ทับทิม", text="วัฒนธรรม ศาลเจ้าแม่ทับทิม")),
-            ])
-        )
-    ])
+    culture_text = get_about("culture")
+    if not culture_text:
+        culture_text = "🏛️ วัฒนธรรมท่ายาง\n\nชุมชนท่ายางมีการผสมผสานวัฒนธรรมไทยและจีนอย่างกลมกลืน มีวัดวาอาราม ศาลเจ้า และสถานที่ทางวัฒนธรรมที่สำคัญหลายแห่งค่ะ"
+    _push(api, user_id, [_text(culture_text)])
 
 
 # =========================
@@ -1227,20 +1215,7 @@ def _process_message(reply_token: str, text: str, user_id: str):
                     content_text = INFO_FALLBACK.get(section_key, "ขอโทษค่ะ ยังไม่มีข้อมูลนี้ค่ะ")
                 _push(api, user_id, [_text(content_text)])
 
-            elif t.startswith("วัฒนธรรม "):
-                place_name = t.replace("วัฒนธรรม ", "", 1).strip()
-                # ดึงจาก chatbot_place ก่อน (เหมือน place detail ปกติ)
-                p = search_place(place_name)
-                if p:
-                    send_place_detail(api, event, p["place_name"])
-                else:
-                    # fallback: ลองดึงจาก about_us (ถ้ามี)
-                    key = CULTURE_KEY_MAP.get(place_name)
-                    culture_text = get_about(key) if key else ""
-                    if culture_text:
-                        _push(api, user_id, [_text(culture_text)])
-                    else:
-                        _push(api, user_id, [_text(f"ขอโทษค่ะ ไม่พบข้อมูลเกี่ยวกับ {place_name} ค่ะ")])
+
 
             # ── open/close time ──
             elif t.startswith("เวลาเปิดปิดของ"):
